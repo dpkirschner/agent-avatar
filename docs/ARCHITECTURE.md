@@ -168,8 +168,12 @@ A TOML file listing the screens an agent may show (name, title, URL,
 and optional `[screen.params]`); see `examples/screens.toml`. Agents
 pick screens by name only, so a compromised or confused agent can't
 point the display at an arbitrary URL. A param is either a list of
-allowed values or a kind (`"date"`, `"int"`); the server checks the
-agent's values and appends them as a query string, so an embeddable
+allowed values or a kind: `"date"` (a real `YYYY-MM-DD`), `"month"`
+(`YYYY-MM`), `"date_or_month"`, `"span"` (a date or month, or `a..b` of
+those), `"word"` (1-40 letters, digits, spaces and `- _ & ' .`) or
+`"int"`. The server checks each of the agent's values on its own (an
+unknown param or a bad value is a `400`) and appends them as a query
+string; rules between params are the framed page's to check, so an embeddable
 chart view can take `metric`, `range` or `highlight` without the agent
 ever writing a URL. The pages it lists must allow being framed by the avatar's origin
 (`frame-ancestors`).

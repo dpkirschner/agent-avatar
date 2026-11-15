@@ -582,7 +582,9 @@ mod tests {
             .to_str()
             .unwrap()
             .to_string();
-        assert!(csp.contains("frame-src https://status.example.com https://weather.example.com;"));
+        assert!(csp.contains(
+            "frame-src https://charts.example.com https://status.example.com https://weather.example.com;"
+        ));
         assert!(csp.contains("frame-ancestors 'none'"));
     }
 
@@ -716,6 +718,8 @@ mod tests {
             body.contains(r#""params":{"day":"date","range":["today","7d","30d"]}"#),
             "{body}"
         );
+        assert!(body.contains(r#""from":"date_or_month""#), "{body}");
+        assert!(body.contains(r#""highlight":"span""#), "{body}");
     }
 
     #[tokio::test]

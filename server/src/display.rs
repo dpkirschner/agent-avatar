@@ -8,7 +8,7 @@
 //! HTML or URLs: a `screen` card names a configured screen, and its URL
 //! is built here from the screens config and the screen's allowed params.
 
-use crate::config::{ParamKind, ParamRule, Screen};
+use crate::config::{ParamRule, Screen};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -609,8 +609,7 @@ fn screen_url(s: &Screen, params: &BTreeMap<String, Scalar>) -> Result<String, S
         let val = v.as_param();
         let ok = match rule {
             ParamRule::OneOf(allowed) => allowed.contains(&val),
-            ParamRule::Kind(ParamKind::Date) => is_date(&val),
-            ParamRule::Kind(ParamKind::Int) => val.parse::<i64>().is_ok(),
+            ParamRule::Kind(kind) => kind.accepts(&val),
         };
         if !ok {
             return Err(format!("param {key}: {val:?} is not allowed"));
@@ -812,6 +811,23 @@ mod tests {
             card(json!({"type": "screen", "name": "weather", "params": {"src": "x"}})).is_err()
         );
         assert!(card(json!({"type": "screen", "name": "nope"})).is_err());
+        let c = card(json!({"type": "screen", "name": "chart", "params": {
+            "metric": "category", "category": "Food & Drink", "highlight": "2026-09..2026-10"
+        }}))
+        .unwrap();
+        let Card::Screen(s) = c else { panic!() };
+        assert_eq!(
+            s.url.as_deref(),
+            Some("https://charts.example.com/embed/chart?category=Food%20%26%20Drink&highlight=2026-09..2026-10&metric=category")
+        );
+        for (k, v) in [
+            ("highlight", "2026-13"),
+            ("category", "a=b"),
+            ("from", "2026-09..2026-10"),
+        ] {
+            let c = json!({"type": "screen", "name": "chart", "params": {k: v}});
+            assert!(card(c).is_err(), "{k}={v}");
+        }
         // The agent can't supply the URL itself.
         assert!(
             card(json!({"type": "screen", "name": "status", "url": "https://evil.example/"}))

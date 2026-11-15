@@ -1,8 +1,15 @@
 # Synthetic example screens config. Copy to ./screens.toml (gitignored)
 # and point the entries at your own pages. The agent shows one with a
-# `screen` card naming it, plus any params listed under it: a list
-# allows those values, "date" any YYYY-MM-DD, "int" any whole number.
-# Params reach the page as a query string.
+# `screen` card naming it, plus any params listed under it. A list
+# allows those values; a kind allows any value of it:
+#   "date"           a real day, YYYY-MM-DD
+#   "month"          YYYY-MM
+#   "date_or_month"  either of those
+#   "span"           a date or month, or a..b of those (2026-09..2026-10)
+#   "word"           1-40 letters, digits, spaces and - _ & ' .
+#   "int"            a whole number
+# The server checks each value on its own and builds the query string;
+# rules between params (one only with another) are the page's to check.
 
 [[screen]]
 name = "status"
@@ -17,3 +24,18 @@ url = "https://weather.example.com/today"
 [screen.params]
 range = ["today", "7d", "30d"]
 day = "date"
+
+# An embeddable chart view: the page draws one chart from its params.
+[[screen]]
+name = "chart"
+title = "Chart"
+url = "https://charts.example.com/embed/chart"
+
+[screen.params]
+metric = ["spending", "category", "balance"]
+category = "word"
+range = ["3m", "6m", "12m", "ytd", "all"]
+from = "date_or_month"
+to = "date_or_month"
+highlight = "span"
+theme = ["auto", "light", "dark"]

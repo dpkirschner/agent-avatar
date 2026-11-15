@@ -28,7 +28,7 @@ setup).
 | GET    | `/version` | `{"version": "v2026.11.0"}` (the release tag, or the crate version in a dev build) |
 | GET    | `/status`  | `{"pages": 1, "page_seen_secs": 0, "adapters": 1}`: pages and adapters (`/heard/events` listeners) connected now, and seconds since a page was last connected (0 while one is; seconds since the server started if none has been). For monitoring. |
 | GET    | `/state`   | `{"preset", "content", "status", "avatar", "last_say"}`: the whole display (as in the `display` event), the avatar state, and the last line said or `null` |
-| GET    | `/screens` | `[{"name": "weather", "title": "Weather", "params": {"range": ["today", "7d"], "day": "date"}}]`: names, titles and allowed params, never URLs |
+| GET    | `/screens` | `[{"name": "weather", "title": "Weather", "params": {"range": ["today", "7d"], "day": "date"}}]`: names, titles and allowed params, never URLs. A param is a list of allowed values or a kind: `date`, `month`, `date_or_month`, `span`, `word`, `int` (ARCHITECTURE "Screens config") |
 
 ## Commands (agent → server, token)
 
@@ -80,7 +80,7 @@ Texts are non-empty; the limits below are in characters.
 | `goals` | `title?`, `items`: 1–6 × `{name (80), progress: 0–1, current?, target?, due?: time}` |
 | `chart` | `title?`, `kind: line \| bar`, `unit?`, `series`: 1–4 × `{name (40), points: [[x, y], ...]}` (500 points in all), `highlight?`: `{from, to}` or `{at}`. Every x is a number, or every x is text: times make a time axis, other text categories. |
 | `transcript` | `lines?`: 1–50, how many recent lines the page shows |
-| `screen` | `name` from the screens config, `params?`: `{name: value}`, each allowed by that screen's `params` |
+| `screen` | `name` from the screens config, `params?`: `{name: value}`, each allowed by that screen's `params` (an unknown param or a bad value is a `400`) |
 
 A `screen` card reaches the page with the screen's `title` and its
 `url`, built here: the configured URL plus the params as a query
