@@ -5,9 +5,21 @@
 /// Longest line `POST /say` accepts, in characters.
 pub const MAX_SAY_CHARS: usize = 2000;
 
-/// Clean `body` for speech. Returns `None` when nothing speakable is
-/// left (an empty message, or only code).
+/// Clean `body` for speech and fit it to the length limit. Returns
+/// `None` when nothing speakable is left (an empty message, or only
+/// code).
 pub fn for_speech(body: &str) -> Option<String> {
+    let text = clean(body);
+    if text.is_empty() {
+        None
+    } else {
+        Some(fit(&text))
+    }
+}
+
+/// Clean `body` for speech, without the length limit: one trimmed line
+/// per source line, runs of whitespace collapsed, blank lines dropped.
+pub fn clean(body: &str) -> String {
     let mut lines = Vec::new();
     let mut in_code = false;
     let mut quote_prefix = body.trim_start().starts_with("> <@");
@@ -30,17 +42,17 @@ pub fn for_speech(body: &str) -> Option<String> {
         }
         let line = strip_block_markers(line);
         let line = unwrap_inline(line);
+        let line = line.split_whitespace().collect::<Vec<_>>().join(" ");
         if !line.is_empty() {
             lines.push(line);
         }
     }
-    let text = lines.join("\n");
-    let text = text.trim();
-    if text.is_empty() {
-        None
-    } else {
-        Some(truncate(text, MAX_SAY_CHARS))
-    }
+    lines.join("\n")
+}
+
+/// Fit a cleaned line to the display server's limit.
+pub fn fit(text: &str) -> String {
+    truncate(text, MAX_SAY_CHARS)
 }
 
 fn strip_block_markers(line: &str) -> &str {

@@ -7,11 +7,21 @@ use serde_json::Value;
 /// Something the agent did in the room.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Incoming {
-    /// A new `m.text` or `m.notice` message.
-    Message { event_id: String, body: String },
+    /// A new `m.text` or `m.notice` message. `live` when it carries the
+    /// MSC4357 live mark: a draft the agent is still streaming.
+    Message {
+        event_id: String,
+        body: String,
+        live: bool,
+    },
     /// An `m.replace` edit: `target` is the original message's id, `body`
-    /// the full new text (`m.new_content`).
-    Edit { target: String, body: String },
+    /// the full new text (`m.new_content`). `live` while the stream goes
+    /// on; the edit without the mark is the final text.
+    Edit {
+        target: String,
+        body: String,
+        live: bool,
+    },
     /// The agent started (`true`) or stopped typing.
     Typing(bool),
 }
@@ -68,13 +78,23 @@ fn message(ev: &Value, agent: &str) -> Option<Incoming> {
     let rel = &content["m.relates_to"];
     if rel["rel_type"] == "m.replace" {
         let target = rel["event_id"].as_str()?.to_string();
-        let body = speakable_body(&content["m.new_content"])?;
-        return Some(Incoming::Edit { target, body });
+        let new = &content["m.new_content"];
+        let body = speakable_body(new)?;
+        let live = is_live(new) || is_live(content);
+        return Some(Incoming::Edit { target, body, live });
     }
     Some(Incoming::Message {
         event_id: ev["event_id"].as_str()?.to_string(),
         body: speakable_body(content)?,
+        live: is_live(content),
     })
+}
+
+/// MSC4357: a message or edit still being streamed carries this key.
+pub const LIVE_KEY: &str = "org.matrix.msc4357.live";
+
+fn is_live(content: &Value) -> bool {
+    content.get(LIVE_KEY).is_some()
 }
 
 /// The body of a text or notice message; images, files and redacted
@@ -135,15 +155,18 @@ mod tests {
             vec![
                 Incoming::Message {
                     event_id: "$1".into(),
-                    body: "Two".into()
+                    body: "Two".into(),
+                    live: false
                 },
                 Incoming::Edit {
                     target: "$1".into(),
-                    body: "Two new mail".into()
+                    body: "Two new mail".into(),
+                    live: false
                 },
                 Incoming::Message {
                     event_id: "$6".into(),
-                    body: "Working on it".into()
+                    body: "Working on it".into(),
+                    live: false
                 },
             ]
         );
@@ -183,7 +206,8 @@ mod tests {
             items,
             vec![Incoming::Message {
                 event_id: "$new".into(),
-                body: "fresh".into()
+                body: "fresh".into(),
+                live: false
             }]
         );
     }
@@ -193,5 +217,46 @@ mod tests {
         assert!(parse_sync(&json!({}), ROOM, AGENT, 0).is_err());
         let p = parse_sync(&json!({"next_batch": "s9"}), ROOM, AGENT, 0).unwrap();
         assert!(p.items.is_empty());
+    }
+
+    #[test]
+    fn reads_the_msc4357_live_mark() {
+        let live = json!({});
+        let resp = page(
+            json!([
+                {"type": "m.room.message", "sender": AGENT, "event_id": "$1",
+                 "content": {"msgtype": "m.text", "body": "Working", LIVE_KEY: live}},
+                {"type": "m.room.message", "sender": AGENT, "event_id": "$2",
+                 "content": {"msgtype": "m.text", "body": "* Two", LIVE_KEY: live,
+                   "m.new_content": {"msgtype": "m.text", "body": "Two", LIVE_KEY: live},
+                   "m.relates_to": {"rel_type": "m.replace", "event_id": "$1"}}},
+                {"type": "m.room.message", "sender": AGENT, "event_id": "$3",
+                 "content": {"msgtype": "m.text", "body": "* Two new.",
+                   "m.new_content": {"msgtype": "m.text", "body": "Two new."},
+                   "m.relates_to": {"rel_type": "m.replace", "event_id": "$1"}}}
+            ]),
+            json!([]),
+        );
+        let items = parse_sync(&resp, ROOM, AGENT, 0).unwrap().items;
+        assert_eq!(
+            items,
+            vec![
+                Incoming::Message {
+                    event_id: "$1".into(),
+                    body: "Working".into(),
+                    live: true
+                },
+                Incoming::Edit {
+                    target: "$1".into(),
+                    body: "Two".into(),
+                    live: true
+                },
+                Incoming::Edit {
+                    target: "$1".into(),
+                    body: "Two new.".into(),
+                    live: false
+                },
+            ]
+        );
     }
 }

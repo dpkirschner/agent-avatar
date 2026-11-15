@@ -2,8 +2,8 @@
 //!
 //! What the user says on the kiosk page arrives on the display server's
 //! `/heard/events` stream and goes into a Matrix room as the adapter's
-//! user. The agent's replies in that room (settled across edits) go back
-//! to the display server as `say`; its typing turns the avatar
+//! user. The agent's replies in that room go back to the display server
+//! as `say`, sentence by sentence while they stream (see `replies`); its typing turns the avatar
 //! `thinking`. See docs/ARCHITECTURE.md § Adapters.
 
 pub mod config;
@@ -56,7 +56,7 @@ pub async fn run(cfg: Config) -> Result<(), String> {
     tokio::select! {
         r = heard_loop(avatar.clone(), hs.clone()) => r,
         r = sync_loop(hs, cfg.room.clone(), cfg.agent_user.clone(), tx) => r,
-        r = speak_loop(avatar, rx, cfg.settle) => r,
+        r = speak_loop(avatar, rx) => r,
     }
 }
 
@@ -159,13 +159,10 @@ async fn sync_loop(
     }
 }
 
-/// Settle replies and say them; follow the agent's typing on the avatar.
-async fn speak_loop(
-    avatar: Arc<Avatar>,
-    mut rx: mpsc::Receiver<Incoming>,
-    settle: Duration,
-) -> Result<(), String> {
-    let mut replies = Replies::new(settle);
+/// Say the agent's replies as they become safe to say; follow its
+/// typing on the avatar.
+async fn speak_loop(avatar: Arc<Avatar>, mut rx: mpsc::Receiver<Incoming>) -> Result<(), String> {
+    let mut replies = Replies::new();
     let mut typing = false;
     loop {
         let due = replies.next_due();
@@ -179,9 +176,11 @@ async fn speak_loop(
             item = rx.recv() => {
                 let Some(item) = item else { return Err("sync stopped".into()) };
                 let now = Instant::now();
-                match item {
-                    Incoming::Message { event_id, body } => replies.message(&event_id, &body, now),
-                    Incoming::Edit { target, body } => replies.edit(&target, &body, now),
+                let lines = match item {
+                    Incoming::Message { event_id, body, live } => {
+                        replies.message(&event_id, &body, live, now)
+                    }
+                    Incoming::Edit { target, body, live } => replies.edit(&target, &body, live, now),
                     Incoming::Typing(t) => {
                         let state = match (typing, t) {
                             (false, true) => Some("thinking"),
@@ -192,14 +191,16 @@ async fn speak_loop(
                         if let Some(s) = state {
                             report(avatar.avatar(s).await)?;
                         }
+                        Vec::new()
                     }
+                };
+                for line in lines {
+                    report(avatar.say(&line).await)?;
                 }
             }
             () = wait => {
-                for text in replies.take_due(Instant::now()) {
-                    if let Some(line) = speech::for_speech(&text) {
-                        report(avatar.say(&line).await)?;
-                    }
+                for line in replies.take_due(Instant::now()) {
+                    report(avatar.say(&line).await)?;
                 }
             }
         }

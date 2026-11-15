@@ -1,6 +1,7 @@
 //! The adapter against a fake homeserver and a fake display server
-//! (synthetic data): speech goes into the room, the agent's settled
-//! reply comes back as one `say`, history and other senders are ignored.
+//! (synthetic data): speech goes into the room, the agent's streamed
+//! reply comes back sentence by sentence without its tool progress,
+//! history and other senders are ignored.
 
 use agent_avatar_matrix::config::Config;
 use axum::extract::{Path, Query, State};
@@ -18,6 +19,7 @@ use std::time::Duration;
 
 const ROOM: &str = "!room:example.org";
 const AGENT: &str = "@agent:example.org";
+const LIVE: &str = "org.matrix.msc4357.live";
 const AVATAR_TOKEN: &str = "avatar-test-token";
 
 #[derive(Default)]
@@ -75,12 +77,26 @@ async fn sync(State(seen): State<Shared>, Query(q): Query<HashMap<String, String
                         "@tablet:example.org",
                         json!({"msgtype": "m.text", "body": "what's new"})
                     ),
-                    msg("$1", AGENT, json!({"msgtype": "m.text", "body": "Two"})),
+                    // A streamed reply (MSC4357): tool progress, a live
+                    // draft, then the final edit without the live mark.
+                    msg(
+                        "$1",
+                        AGENT,
+                        json!({"msgtype": "m.text", "body": "Working\n\n`🛠️ Exec: running`",
+                        LIVE: {}})
+                    ),
                     msg(
                         "$2",
                         AGENT,
-                        json!({"msgtype": "m.text", "body": "* Two new **mail**.",
-                        "m.new_content": {"msgtype": "m.text", "body": "Two new **mail**."},
+                        json!({"msgtype": "m.text", "body": "* Two new **mail**. The first", LIVE: {},
+                        "m.new_content": {"msgtype": "m.text", "body": "Two new **mail**. The first", LIVE: {}},
+                        "m.relates_to": {"rel_type": "m.replace", "event_id": "$1"}})
+                    ),
+                    msg(
+                        "$3",
+                        AGENT,
+                        json!({"msgtype": "m.text", "body": "* Two new **mail**. The first is from Sam.",
+                        "m.new_content": {"msgtype": "m.text", "body": "Two new **mail**. The first is from Sam."},
                         "m.relates_to": {"rel_type": "m.replace", "event_id": "$1"}})
                     )
                 ]),
@@ -183,12 +199,11 @@ fn config(homeserver: String, avatar_url: String) -> Config {
         room: ROOM.into(),
         agent_user: AGENT.into(),
         matrix_token: "matrix-test-token".into(),
-        settle: Duration::from_millis(100),
     }
 }
 
 #[tokio::test]
-async fn speech_goes_in_and_the_settled_reply_comes_out_once() {
+async fn speech_goes_in_and_a_streamed_reply_comes_out_by_sentence() {
     let seen = Shared::default();
     let hs = serve(homeserver(seen.clone(), false)).await;
     let avatar = serve(display(seen.clone())).await;
@@ -206,7 +221,7 @@ async fn speech_goes_in_and_the_settled_reply_comes_out_once() {
 
     let seen = seen.lock().unwrap();
     assert_eq!(seen.sent, vec!["what's new"]);
-    assert_eq!(seen.said, vec!["Two new mail."]);
+    assert_eq!(seen.said, vec!["Two new mail.", "The first is from Sam."]);
     assert_eq!(seen.avatars, vec!["thinking"]);
 }
 

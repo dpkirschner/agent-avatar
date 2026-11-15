@@ -4,8 +4,6 @@
 //! from 0600 files named by `*_FILE` variables; the Matrix token has no
 //! plain-environment form.
 
-use std::time::Duration;
-
 /// Everything the adapter needs to run.
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -23,12 +21,9 @@ pub struct Config {
     pub agent_user: String,
     /// Access token for `user`.
     pub matrix_token: String,
-    /// How long a reply must go without an edit before it is spoken.
-    pub settle: Duration,
 }
 
 pub const DEFAULT_AVATAR_URL: &str = "http://127.0.0.1:8075";
-pub const DEFAULT_SETTLE_MS: u64 = 1500;
 
 impl Config {
     /// Read the configuration from the process environment.
@@ -55,13 +50,6 @@ impl Config {
         };
         let token_path = need("MATRIX_TOKEN_FILE")?;
         let matrix_token = file("MATRIX_TOKEN_FILE", &token_path)?;
-        let settle = match var("MATRIX_SETTLE_MS") {
-            Some(ms) => ms
-                .trim()
-                .parse::<u64>()
-                .map_err(|_| format!("MATRIX_SETTLE_MS {ms:?}: not a number of milliseconds"))?,
-            None => DEFAULT_SETTLE_MS,
-        };
         let cfg = Config {
             avatar_url: trim_slash(&avatar_url),
             avatar_token,
@@ -70,7 +58,6 @@ impl Config {
             room: need("MATRIX_ROOM")?,
             agent_user: need("MATRIX_AGENT_USER")?,
             matrix_token,
-            settle: Duration::from_millis(settle),
         };
         for (k, v) in [
             ("AVATAR_URL", &cfg.avatar_url),
@@ -138,7 +125,6 @@ mod tests {
         assert_eq!(cfg.avatar_url, DEFAULT_AVATAR_URL);
         assert_eq!(cfg.avatar_token, None);
         assert_eq!(cfg.matrix_token, "secret-from-/secrets/matrix");
-        assert_eq!(cfg.settle, Duration::from_millis(DEFAULT_SETTLE_MS));
     }
 
     #[test]
@@ -158,7 +144,6 @@ mod tests {
             ("MATRIX_ROOM", "#alias:example.org"),
             ("MATRIX_USER", "tablet"),
             ("MATRIX_HOMESERVER", "127.0.0.1:8008"),
-            ("MATRIX_SETTLE_MS", "soon"),
             ("MATRIX_AGENT_USER", "@tablet:example.org"),
         ] {
             let mut env = base();

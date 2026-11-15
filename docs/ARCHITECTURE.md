@@ -157,13 +157,23 @@ its own user (the tablet's identity) and shares a room with the agent.
 - **Speech in.** Each `heard` utterance is sent to the room as an
   `m.text` message.
 - **Replies out.** It long-polls `/sync`, filtered to the room, and
-  speaks the agent's `m.text` and `m.notice` messages. Agents that
-  stream a reply post a message, then edit it (`m.replace`); the
-  adapter keeps the newest `m.new_content` and speaks once the reply
-  has gone `MATRIX_SETTLE_MS` without an edit. An edit that arrives
-  after the reply was spoken and only adds to it (the agent paused
-  mid-stream) is spoken as the new tail; any other late edit is
-  dropped. Markdown, code blocks and reply quotes are stripped and
+  speaks the agent's `m.text` and `m.notice` messages. A message
+  without the MSC4357 live mark (`org.matrix.msc4357.live`) is final
+  and spoken at once. A streamed reply is a live draft, live `m.replace`
+  edits of it, and a final edit without the mark; timing never decides
+  anything (`replies.rs`):
+  - While live, each sentence (ending in `.`, `!`, `?` or a line break)
+    is spoken once more text follows it, and only text that extends
+    what was already said. A draft that no longer starts with that was
+    replaced: nothing more until the final.
+  - The final speaks what of it wasn't said: the text after the longest
+    sentence-aligned prefix it shares with what was.
+  - A leading tool-progress block (a short label such as "Working", a
+    blank line, then backticked tool lines) is never spoken.
+  - A live draft with no edit for 30 s is taken as final.
+  - An edit after the final that only adds to it is spoken as the new
+    tail; any other late edit is dropped. Markdown, code blocks and
+    reply quotes are stripped and
   URLs read as "link".
 - **Avatar.** When the agent starts typing, the avatar turns
   `thinking` (`POST /display {"avatar": "thinking"}`); a `say` returns
@@ -189,11 +199,10 @@ Configuration (environment, read once at startup):
 | `MATRIX_TOKEN_FILE` | 0600 file holding that user's access token (required; no plain-env form). |
 | `MATRIX_ROOM` | Room id, `!id:server` (not an alias). |
 | `MATRIX_AGENT_USER` | The agent's user: only its messages are spoken. |
-| `MATRIX_SETTLE_MS` | Quiet time before a reply is spoken, default `1500`. |
 | `RUST_LOG` | Log filter, default `info`. |
 
 Source: `config.rs` (environment), `sync.rs` (the `/sync` response to
-messages, edits and typing), `replies.rs` (settling edits), `speech.rs`
+messages, edits and typing), `replies.rs` (live drafts to sentences), `speech.rs`
 (text for speech), `sse.rs` (the heard stream), `http.rs` (homeserver
 and display-server calls), `lib.rs` (the three loops).
 

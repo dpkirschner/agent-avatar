@@ -44,8 +44,10 @@ have here.
   to an agent's chat, and the agent's replies back to the avatar
   (Matrix first). A separate process using only the display server's
   HTTP API.
-- **Settle**: a reply is settled once it has gone `MATRIX_SETTLE_MS`
-  without an edit; only then is it spoken, so a streamed reply is said
-  once.
+- **Live draft**: a reply the agent is still streaming, marked with
+  MSC4357's `org.matrix.msc4357.live` key; the edit without the key is
+  the final text. Its complete sentences are spoken as they arrive.
+- **Tool progress**: the "Working" label and backticked tool lines an
+  agent shows in a draft before its answer; never spoken.
 - **Event**: one message from the display server to the page over SSE
   (`display`, `say`), or to an adapter (`heard`).

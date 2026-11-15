@@ -260,12 +260,12 @@ class DeploySetupMatrix(unittest.TestCase):
         self.assertIn("setup-matrix", r.stderr)
         self.write_token()
         self.assertEqual(self.run_deploy("setup-matrix", *self.ARGS).returncode, 0)
-        r = self.run_deploy("env", "--matrix", "set", "--yes", "MATRIX_SETTLE_MS=2500")
+        r = self.run_deploy("env", "--matrix", "set", "--yes", "RUST_LOG=debug")
         self.assertEqual(r.returncode, 0, r.stderr)
         with open(self.mplist, "rb") as f:
-            self.assertEqual(plistlib.load(f)["EnvironmentVariables"]["MATRIX_SETTLE_MS"], "2500")
+            self.assertEqual(plistlib.load(f)["EnvironmentVariables"]["RUST_LOG"], "debug")
         with open(self.plist, "rb") as f:
-            self.assertNotIn("MATRIX_SETTLE_MS", plistlib.load(f)["EnvironmentVariables"])
+            self.assertNotIn("RUST_LOG", plistlib.load(f)["EnvironmentVariables"])
         r = self.run_deploy("env", "--matrix", "set", "--yes", "MATRIX_TOKEN=x")
         self.assertIn("_FILE", r.stderr)
         r = self.run_deploy("status")
