@@ -1,3 +1,3 @@
 .card-transcript li { display: flex; flex-direction: column; }
-.card-transcript .who { font-size: 13px; font-weight: 700; color: var(--card-dim); text-transform: uppercase; letter-spacing: .06em; }
+.card-transcript .who { font-size: 15px; font-weight: 600; color: var(--card-dim); }
 .card-transcript li.you .t { color: var(--card-dim); }

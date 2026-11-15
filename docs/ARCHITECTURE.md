@@ -88,17 +88,26 @@ avatar, app.
   stage. In portrait the columns become rows.
 - **Status lines.** Each template's module draws its items (the server
   checks the slots); the page adds the agent's state, the
-  connection dot and the clock. A dropped stream shows "offline" there,
-  never a blank screen.
+  connection dot and the clock. A stream down for more than 5 s shows
+  an "Offline" pill there, the avatar falls asleep (`offline`) and the
+  cards dim as out of date; never a blank screen.
 - **Cards.** Built from DOM nodes with `textContent` only, by each
   card's module. A card whose module `claims` it (a `screen`, an
   `alerts` card with a `crit` item) takes the content area alone.
   Charts are SVG drawn at the card's pixel size and redrawn on resize.
-  A `screen` card is an iframe, kept across redraws while its URL
-  stays.
+  Content that doesn't fit fades at the cut with "+N more" for list
+  items (text first shrinks to 15px); `Kiosk.fitCard` re-measures on
+  every resize. A lone card or a short stack sits centred in the
+  column. A `screen` card is an iframe, kept across redraws while its
+  URL stays, over a panel with its title: "Loading…" until the frame
+  loads and a `no-cors` probe of its URL answers, "Can't reach" after
+  a failed probe or 15 s, retried every minute.
 - **Subtitles.** The agent's current line sits under the avatar,
   revealed word by word (browser voice: boundary events; server audio:
-  `words` timings on the audio clock; neither: the whole line). The
+  `words` timings on the audio clock; neither: the whole line). At
+  most three lines show (five in `focus`): a longer line pages on with
+  the word being said, or every 4.5 s when there is no word clock. The
+  line dims after 10 s and goes after 3 minutes. The
   owner's last utterance shows small above it. A `transcript` card
   shows both sides' recent lines, kept in the page only.
 
@@ -110,7 +119,9 @@ avatar, app.
   so swapping the avatar touches nothing else; a theme dresses it only
   through the `--face-*` variables the avatar's CSS declares. What shows is `talking`
   while the page is speaking, else `listening` while the mic is on,
-  else the server's avatar state. While talking the page drives
+  else `offline` while the stream is down, else the server's avatar
+  state. The mic button lights only for the page's own listening, not
+  for a server-set `listening`. While talking the page drives
   `mouth` every frame: a word boundary opens it, and with no
   boundaries it moves on a gentle loop. To add one: a folder with both
   files; nothing else.
@@ -121,6 +132,9 @@ avatar, app.
 - **Speech in.** Tap-to-talk by default; "Listen continuously" in
   settings keeps restarting recognition. Each finished utterance goes
   to `POST /heard`; if no adapter is listening, the page says so.
+- **Night.** After 10 minutes with no event from the server, no
+  speech and no touch, a veil (`--night-dim`) dims the whole page;
+  any event, speech or touch lifts it.
 - **Settings.** Hold the top-left corner for 0.8 s: continuous
   listening, browser voice and rate (kept in `localStorage`), full
   screen, reload.

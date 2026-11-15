@@ -12,6 +12,7 @@
   --ink: #17173a;
   --sun: #ffc83d;
   --tomato: #e2462b;
+  --tomato-deep: #c03a1f;   /* tomato that carries text: 4.9:1 with cream */
 
   --bg: var(--cobalt);
   --fg: var(--cream);
@@ -20,6 +21,7 @@
   --good: #2f7d52;
   --warn: #c0700f;
   --bad: var(--tomato);
+  --bad-ink: var(--tomato-deep);
   --font-body: "Atkinson Hyperlegible Next", system-ui, sans-serif;
   --font-display: "Fraunces", Georgia, serif;
   --display-axes: "SOFT" 100, "WONK" 1;
@@ -30,6 +32,8 @@
   --status-size: 15px;
   --status-weight: 600;
   --status-rule: 0;
+  --down-bg: var(--tomato-deep);
+  --down-fg: var(--cream);
 
   --said-size: 30px;
   --said-weight: 560;
@@ -62,11 +66,15 @@
   --hl: var(--sun);
   --hl-opacity: .35;
   --plot-line: 4px;
-  --s1: var(--cobalt); --s2: var(--tomato); --s3: #b8860b; --s4: var(--good);
+  --s1: var(--cobalt); --s2: var(--tomato); --s3: #a87a0a; --s4: var(--good);
 
-  --claim-bg: var(--tomato);
+  --claim-bg: var(--tomato-deep);
   --claim-fg: var(--cream);
   --claim-border: 3px solid var(--ink);
+  --claim-dot: var(--cream);
+
+  --stale-opacity: .6;
+  --night-dim: rgba(10, 14, 40, .62);
 
   --overlay-bg: rgba(35, 64, 184, .95);
 
@@ -80,12 +88,14 @@
   --face-ink: var(--ink);
   --face-ring: var(--cream);
   --face-dots: var(--cream);
+  --face-offline: #b9b4a4;
 }
 ::selection { background: var(--sun); color: var(--ink); }
 
 /* signature touches beyond the tokens */
 #agent-state { font-family: var(--font-display); font-variation-settings: var(--display-axes); font-size: 17px; color: var(--fg); }
 #link { box-shadow: 0 0 0 2px var(--ink); }
+#app.down #agent-state { box-shadow: 0 0 0 2px var(--ink); }
 #heard.note { color: var(--sun); }
 #stage { padding-top: 6px; }
 /* bars: the highlighted bar in sunflower, the rest cream, all outlined */

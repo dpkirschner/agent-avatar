@@ -190,7 +190,8 @@ async fn page_file(uri: axum::http::Uri) -> Response {
 
 /// The kiosk page, with its folders' files linked in, and a
 /// CSP that frames only the configured screens' origins and lets nothing
-/// frame the page itself.
+/// frame the page itself. The page may also reach those origins with an
+/// opaque (`no-cors`) request: the screen card's reachability probe.
 async fn index(State(st): State<Shared>) -> Response {
     let html = INDEX_HTML.replace("{{head}}", &st.head);
     let mut res = (
@@ -218,9 +219,13 @@ fn page_csp(screens: &[Screen]) -> String {
     } else {
         origins.join(" ")
     };
+    let connect = std::iter::once("'self'".to_string())
+        .chain(origins.iter().cloned())
+        .collect::<Vec<_>>()
+        .join(" ");
     format!(
         "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; \
-         media-src 'self' data: blob:; connect-src 'self'; frame-src {frames}; \
+         media-src 'self' data: blob:; connect-src {connect}; frame-src {frames}; \
          frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
     )
 }
@@ -570,6 +575,10 @@ mod tests {
             "frame-src https://charts.example.com https://status.example.com https://weather.example.com;"
         ));
         assert!(csp.contains("frame-ancestors 'none'"));
+        // The screen card probes its screen's origin before showing it.
+        assert!(csp.contains(
+            "connect-src 'self' https://charts.example.com https://status.example.com https://weather.example.com;"
+        ));
     }
 
     #[test]
@@ -638,6 +647,8 @@ mod tests {
             "status/desk/status.js",
             "avatars/blob/avatar.js",
             "themes/picture-book/theme.css",
+            "icon.svg",
+            "apple-touch-icon.png",
         ] {
             assert!(html.contains(f), "{f} not linked");
             assert_eq!(get(&app, &format!("/{f}")).await.0, StatusCode::OK, "{f}");

@@ -47,13 +47,34 @@
     let y1 = Math.max(...ys);
     if (bars) { y0 = Math.min(0, y0); y1 = Math.max(0, y1); }
     if (y0 === y1) { y0 -= 1; y1 += 1; }
-    const pad = (y1 - y0) * 0.08;
-    if (!(bars && y0 === 0)) y0 -= pad;
-    y1 += pad;
 
-    const L = 48, R = 12, T = 8, B = 24;
-    const iw = W - L - R, ih = H - T - B;
+    const R = 12, T = 10, B = 24;
+    const ih = H - T - B;
+    // y: round ticks (1, 2, 2.5 or 5 × 10^n), about one per 45px, and
+    // the scale runs from the first tick to the last.
+    const ticks = niceTicks(y0, y1, Math.max(2, Math.min(5, Math.floor(ih / 45))));
+    y0 = ticks[0];
+    y1 = ticks[ticks.length - 1];
     const sy = (y) => T + ih - ((y - y0) / (y1 - y0)) * ih;
+
+    const s = svg('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: 'img' });
+    s.setAttribute('aria-label', c.title || 'Chart');
+    plot.appendChild(s);
+
+    // y labels first: the left gutter is as wide as the widest one.
+    const axis = svg('g', {}, 'axis');
+    s.appendChild(axis);
+    const ylabels = ticks.map((v, i) => {
+      const t = svg('text', { y: sy(v) + 4, 'text-anchor': 'end' });
+      t.textContent = fmtNum(v) + (i === ticks.length - 1 && c.unit ? ' ' + c.unit : '');
+      axis.appendChild(t);
+      return t;
+    });
+    let widest = 0;
+    for (const t of ylabels) widest = Math.max(widest, t.getComputedTextLength ? t.getComputedTextLength() : 0);
+    const L = Math.ceil(widest) + 14;
+    for (const t of ylabels) t.setAttribute('x', L - 8);
+    const iw = W - L - R;
 
     // Band positions for bars and categories; a linear scale otherwise.
     let slots = null;
@@ -72,21 +93,10 @@
       sx = (x) => L + (x1 === x0 ? iw / 2 : ((xval(x) - x0) / (x1 - x0)) * iw);
     }
 
-    const s = svg('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: 'img' });
-    s.setAttribute('aria-label', c.title || 'Chart');
-
-    // Grid and y labels: three lines.
+    // Grid behind everything.
     const grid = svg('g', {}, 'grid');
-    const axis = svg('g', {}, 'axis');
-    for (let i = 0; i <= 2; i++) {
-      const v = y0 + ((y1 - y0) * i) / 2;
-      const y = sy(v);
-      grid.appendChild(svg('line', { x1: L, x2: W - R, y1: y, y2: y }));
-      const t = svg('text', { x: L - 8, y: y + 4, 'text-anchor': 'end' });
-      t.textContent = fmtNum(v) + (i === 2 && c.unit ? ' ' + c.unit : '');
-      axis.appendChild(t);
-    }
-    s.append(grid);
+    for (const v of ticks) grid.appendChild(svg('line', { x1: L, x2: W - R, y1: sy(v), y2: sy(v) }));
+    s.insertBefore(grid, axis);
 
     // Highlight behind the data.
     const hl = c.highlight;
@@ -103,7 +113,9 @@
     }
 
     // x labels: first, middle, last.
-    const xlabel = (x) => (kind === 'time' ? fmtTick(x) : String(x));
+    const months = kind === 'cat' && xs.every((x) => MONTH.test(x));
+    const years = months ? new Set(xs.map((x) => x.slice(0, 4))).size : 0;
+    const xlabel = (x) => (kind === 'time' ? fmtTick(x) : months ? fmtMonth(x, years > 1) : String(x));
     const sorted = slots
       ? slots.map((v) => (kind === 'time' ? new Date(v).toISOString() : v))
       : [...xs].sort((a, b) => xval(a) - xval(b));
@@ -114,7 +126,6 @@
       t.textContent = xlabel(x);
       axis.appendChild(t);
     });
-    s.appendChild(axis);
 
     // Data.
     const inHl = (x) => {
@@ -146,7 +157,25 @@
       }
     });
 
-    plot.appendChild(s);
+  }
+
+  // Round ticks covering [lo, hi], about `count` steps.
+  function niceTicks(lo, hi, count) {
+    const raw = (hi - lo) / count;
+    const p = 10 ** Math.floor(Math.log10(raw));
+    const f = raw / p;
+    const step = (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p;
+    const a = Math.floor(lo / step + 1e-9), b = Math.ceil(hi / step - 1e-9);
+    const out = [];
+    for (let i = a; i <= b; i++) out.push(+(i * step).toPrecision(12));
+    return out;
+  }
+
+  // "2026-06" → "Jun" (with the year when the axis spans more than one).
+  const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
+  function fmtMonth(x, withYear) {
+    const d = new Date(+x.slice(0, 4), +x.slice(5, 7) - 1, 1);
+    return d.toLocaleDateString([], withYear ? { month: 'short', year: '2-digit' } : { month: 'short' });
   }
 
   function fmtTick(x) {
