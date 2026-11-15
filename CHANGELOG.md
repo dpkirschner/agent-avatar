@@ -5,6 +5,39 @@ from 0 each month). Each section is drafted from commit subjects by
 git-cliff (`cliff.toml`) through `scripts/release.py`; big releases open
 with a short summary. See `docs/RELEASING.md`.
 
+## v2026.11.6 (2026-11-14)
+
+The agent now composes the display. One call, `POST /display`, picks a
+layout preset (chat, split, focus), sets the face's state, fills up to
+three typed cards (text, list, figures, goals, chart, calendar, alerts,
+transcript, or a named screen with checked params) and sets the status
+lines. The page has a new default look, the picture-book theme, and is
+assembled from card, status and theme folders so each can be swapped.
+
+**Breaking:** `POST /show` and `POST /sprite` are removed; agents move to
+`POST /display` (see docs/API.md). `/say` is unchanged.
+
+### Features
+
+- `POST /display` with layout presets, typed cards, status lines and
+  word-by-word subtitles under the face (ho-ru7.13) ([5b7cb58](https://github.com/dpkirschner/agent-avatar/commit/5b7cb58))
+- Screen params: each screen lists the params it accepts (value lists or
+  the kinds date, month, date_or_month, span, word, int); the server
+  checks them and builds the URL (ho-39r) ([d573639](https://github.com/dpkirschner/agent-avatar/commit/d573639))
+- The page is built from card, status, theme and avatar folders;
+  `AVATAR_THEME` picks the theme (default `picture-book`, `plain` for the
+  neutral look) (ho-ru7.13) ([33d186c](https://github.com/dpkirschner/agent-avatar/commit/33d186c))
+
+### Changes
+
+- `deploy.sh try --screens FILE` runs a branch with a screens config the
+  live server can't load yet (ho-hqe) ([c9da65c](https://github.com/dpkirschner/agent-avatar/commit/c9da65c))
+
+### Docs
+
+- PRODUCT.md, the kiosk surface brief, the settled `/display` API and
+  card schemas, and DESIGN.md for the picture-book theme (ho-ru7.13)
+
 ## v2026.11.5 (2026-11-14)
 
 ### Fixes
