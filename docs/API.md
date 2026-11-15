@@ -26,6 +26,7 @@ setup).
 | GET    | `/`        | The kiosk page (`/app.js`, `/app.css` alongside). Its CSP frames only the configured screens' origins. |
 | GET    | `/healthz` | `200 ok` |
 | GET    | `/version` | `{"version": "v2026.11.0"}` (the release tag, or the crate version in a dev build) |
+| GET    | `/status`  | `{"pages": 1, "page_seen_secs": 0, "adapters": 1}`: pages and adapters (`/heard/events` listeners) connected now, and seconds since a page was last connected (0 while one is, `null` if none has been since start). For monitoring. |
 | GET    | `/state`   | `{"screen": {...}, "sprite": "idle", "last_say": {...} \| null}` |
 | GET    | `/screens` | `[{"name": "status", "title": "Status"}]`: names and titles only, never URLs |
 

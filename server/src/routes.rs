@@ -20,7 +20,7 @@ use axum::Router;
 use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::sync::broadcast;
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::{Stream, StreamExt};
@@ -102,6 +102,8 @@ pub struct AppState {
     current: Mutex<Current>,
     page_tx: broadcast::Sender<PageEvent>,
     heard_tx: broadcast::Sender<Heard>,
+    /// When the last page stream ended, for `/status`.
+    page_left: Mutex<Option<Instant>>,
 }
 
 impl AppState {
@@ -119,6 +121,7 @@ impl AppState {
             }),
             page_tx,
             heard_tx,
+            page_left: Mutex::new(None),
         })
     }
 
@@ -161,6 +164,7 @@ pub fn router(state: Shared) -> Router {
         .route("/app.css", get(|| async { asset(APP_CSS, "text/css") }))
         .route("/healthz", get(|| async { "ok" }))
         .route("/version", get(version))
+        .route("/status", get(status))
         .route("/state", get(get_state))
         .route("/screens", get(get_screens))
         .route("/events", get(events))
@@ -286,6 +290,35 @@ async fn get_screens(State(st): State<Shared>) -> Response {
     Json(list).into_response()
 }
 
+/// What a monitor needs: pages and adapters connected now, and seconds
+/// since a page was last connected (0 while one is; null if none ever
+/// was). Counts only, no content, so it's open like `/healthz`.
+async fn status(State(st): State<Shared>) -> Json<serde_json::Value> {
+    let pages = st.page_tx.receiver_count();
+    let page_seen_secs = if pages > 0 {
+        Some(0)
+    } else {
+        st.page_left
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .map(|t| t.elapsed().as_secs())
+    };
+    Json(serde_json::json!({
+        "pages": pages,
+        "page_seen_secs": page_seen_secs,
+        "adapters": st.heard_tx.receiver_count(),
+    }))
+}
+
+/// Stamps `page_left` when a page's stream is dropped.
+struct PageLeft(Shared);
+
+impl Drop for PageLeft {
+    fn drop(&mut self) {
+        *self.0.page_left.lock().unwrap_or_else(|e| e.into_inner()) = Some(Instant::now());
+    }
+}
+
 /// The page's event stream: the current screen and sprite state first,
 /// then every change. A `say` is not replayed, so a reconnect never
 /// repeats a line.
@@ -301,8 +334,12 @@ async fn events(State(st): State<Shared>) -> Sse<impl Stream<Item = Result<Event
         ];
         (rx, first)
     };
+    let left = PageLeft(st.clone());
     let live = BroadcastStream::new(rx).filter_map(|r| r.ok().map(|e| e.to_sse()));
-    let stream = tokio_stream::iter(first).chain(live).map(Ok);
+    let stream = tokio_stream::iter(first).chain(live).map(move |e| {
+        let _ = &left;
+        Ok(e)
+    });
     Sse::new(stream).keep_alive(KeepAlive::new().interval(Duration::from_secs(20)))
 }
 
@@ -490,6 +527,34 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn status_counts_pages_and_adapters() {
+        let (app, st) = app(None);
+        let v = |s: String| serde_json::from_str::<serde_json::Value>(&s).unwrap();
+        let (code, body) = get(&app, "/status").await;
+        assert_eq!(code, StatusCode::OK);
+        assert_eq!(
+            v(body),
+            serde_json::json!({"pages": 0, "page_seen_secs": null, "adapters": 0})
+        );
+
+        let page = events(State(st.clone())).await;
+        let adapter = st.heard_tx.subscribe();
+        let (_, body) = get(&app, "/status").await;
+        assert_eq!(
+            v(body),
+            serde_json::json!({"pages": 1, "page_seen_secs": 0, "adapters": 1})
+        );
+
+        drop(page);
+        drop(adapter);
+        let (_, body) = get(&app, "/status").await;
+        let body = v(body);
+        assert_eq!(body["pages"], 0);
+        assert_eq!(body["adapters"], 0);
+        assert_eq!(body["page_seen_secs"], 0, "a page just left");
+    }
+
+    #[tokio::test]
     async fn serves_the_page_with_a_csp_for_screen_origins() {
         let (app, _) = app(None);
         let res = app
@@ -584,7 +649,7 @@ mod tests {
             assert_eq!(s, StatusCode::UNAUTHORIZED, "{path} bare POST");
         }
         // The page's own routes stay open.
-        for path in ["/", "/app.js", "/state", "/screens", "/healthz"] {
+        for path in ["/", "/app.js", "/state", "/screens", "/healthz", "/status"] {
             assert_eq!(get(&app, path).await.0, StatusCode::OK, "{path}");
         }
     }
