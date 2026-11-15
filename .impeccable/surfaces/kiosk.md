@@ -16,13 +16,16 @@ a glance from a desk's distance.
   prebuilt template that sets both its items and its style.
 - Avatar always on the left, content always on the right.
 - Presets change only the proportions: `chat` (avatar wide, content
-  narrow, holds the transcript), `split` (about half each), `focus`
-  (avatar a narrow column, content dominant). The agent picks the
-  preset; it never sends geometry.
+  narrow), `split` (about half each), `focus` (avatar a narrow
+  column, content dominant). The agent picks the preset; it never
+  sends geometry.
+- The transcript's home is subtitles under the avatar, in every
+  preset. A `transcript` card shows the history as content when the
+  agent asks for it.
 
 ## Speech, motion and transcript
 
-- While the agent speaks, the avatar's mouth moves and the transcript
+- While the agent speaks, the avatar's mouth moves and the subtitle
   reveals word by word, both driven by the audio clock.
 - Browser voice: word-boundary events. Server audio: the server sends
   word timings with the audio; mouth openness follows the audio level.
@@ -55,15 +58,63 @@ a glance from a desk's distance.
 - Disconnected: shown in the status line, never a blank screen.
 - No content: falls back to `chat`.
 - Speaking while the mic is on: the mic pauses.
-- Long transcripts: scroll, with only the latest line large.
+- Subtitles: the current line only, the last line or two kept small.
+  History lives in the `transcript` card, which scrolls.
 - An alert may claim the content area.
 
-## API consequence (the agent's tool integration follows this)
+## API (settled 2026-11-14; the agent's tool integration follows this)
 
-- `show` and `sprite` merge into one call, `POST /display`:
-  `{preset, content: [cards], status?}`.
-- `say` gains word timings.
-- Status lines take `{template, items}`.
+`POST /display` (token) replaces `/show` and `/sprite`. Each field
+sent replaces that part; omitted fields keep. `{"avatar":"thinking"}`
+alone is the cheap call the adapter uses for typing.
+
+```json
+{
+  "preset":  "chat | split | focus",
+  "avatar":  "idle | listening | thinking | talking",
+  "content": [card, ...],
+  "status":  {"top":    {"template": "desk", "items": {}},
+              "bottom": {"template": "desk", "items": {}}}
+}
+```
+
+- Up to 3 cards, stacked in the agent's order. A `screen` card or an
+  alerts card with a `crit` item takes the whole content area.
+- `content: []` clears the cards and falls back to `chat`. Cards sent
+  without a preset select `split`.
+- The server validates every card; a bad one answers `422` naming its
+  index. Plain text only, never HTML. Times are ISO 8601.
+
+| type | fields |
+|---|---|
+| `text` | `title?`, `body` (<=2000 chars, paragraphs on blank lines) |
+| `list` | `title?`, `items[{text, detail?, mark?: done/open/warn}]` <=12 |
+| `figures` | `title?`, `items[{label, value, unit?, delta?, tone?: good/bad/neutral}]` <=6 |
+| `alerts` | `items[{level: crit/warn/info, title, detail?, since?}]` <=8 |
+| `calendar` | `title?`, `events[{start, end?, title, where?, all_day?}]` <=10 |
+| `goals` | `title?`, `items[{name, progress 0..1, current?, target?, due?}]` <=6 |
+| `chart` | `title?`, `kind: line/bar`, `unit?`, `series[{name, points[[x,y]]}]` <=4 series, <=500 points; x is a time or a category; `highlight?: {from,to}` or `{at}` |
+| `transcript` | `lines?` (how many recent lines, default all kept) |
+| `screen` | `name`, `params?` checked against that screen's allow-list |
+
+Screen params are declared in the screens config and passed as a
+query string. A list means allowed values; `"date"` or `"int"` means
+that type:
+
+```toml
+[screen.params]
+metric = ["spend", "income"]
+range = ["30d", "90d", "1y"]
+highlight = "date"
+```
+
+Status templates are built into the page; each declares its slots
+(say `desk`: `alerts`, `mail`, `next`). An unknown slot answers
+`422`. Connection and clock come from the page itself.
+
+`/say` is unchanged for the agent. With server audio, the `say` event
+gains `words: [{t_ms, text}]` (ho-ru7.12). `/state` returns the whole
+display.
 
 ## Open
 
@@ -71,5 +122,5 @@ a glance from a desk's distance.
   compare two or three worlds on the real layout. Candidates seen so
   far: Picture Book Spread (flat cobalt, thick-outlined face) and
   Exposure Record (dark backlit sheets, magenta for live voice).
-- Exact card schemas, the preset proportions and the status
-  templates are decided in the build.
+- The preset proportions and the status templates' slots and look
+  are decided in the build.
