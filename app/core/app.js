@@ -43,14 +43,24 @@ face.mount($('#avatar'));
 let serverState = 'idle';
 let speaking = false;
 let listening = false;
-let linkUp = false;
+// Starts up so a page load doesn't flash "Offline"; connect() gives the
+// stream a few seconds to open before saying otherwise.
+let linkUp = true;
+
+// The state word in the status line, sentence case.
+const STATE_WORDS = { idle: '', listening: 'Listening', thinking: 'Thinking', talking: 'Talking', offline: 'Offline' };
 
 function render() {
-  const s = speaking ? 'talking' : listening ? 'listening' : serverState;
+  // Out of reach, the face sleeps unless the page itself is busy
+  // (speaking a line it already has, or listening).
+  const s = speaking ? 'talking' : listening ? 'listening' : linkUp ? serverState : 'offline';
   app.dataset.state = s;
   face.state(s);
   $('#mic').textContent = listening ? 'Stop' : 'Talk';
-  $('#agent-state').textContent = linkUp ? (s === 'idle' ? '' : s) : 'offline';
+  // The mic lights for this page's own recording only, not for a
+  // `listening` the agent set.
+  app.classList.toggle('rec', listening);
+  $('#agent-state').textContent = linkUp ? (STATE_WORDS[s] ?? s) : STATE_WORDS.offline;
   app.classList.toggle('down', !linkUp);
 }
 
@@ -86,31 +96,90 @@ function remember(who, text) {
   }
 }
 
+// The line shows at most a page of lines at a time (three; five in
+// `focus`: whatever #said's max-height holds). A longer line pages on
+// as the words are revealed, so the word being said is always in view;
+// a line revealed all at once pages through on a timer instead.
 const said = $('#said');
+const STALE_MS = 10000;      // then the line dims
+const GONE_MS = 3 * 60000;   // then it goes, so nothing burns in
+const PAGE_MS = 4500;        // a page on screen, when there's no word clock
 let staleTimer = 0;
-let subtitle = null; // { text, done, todo }
+let goneTimer = 0;
+let pageTimer = 0;
+let subtitle = null; // { text, done, todo, n }
 
 function showLine(text, reveal) {
   clearTimeout(staleTimer);
-  said.classList.remove('stale');
+  clearTimeout(goneTimer);
+  clearInterval(pageTimer);
+  pageTimer = 0;
+  said.classList.remove('stale', 'gone');
   said.textContent = '';
   const p = el('span');
   const done = el('span', 'done', reveal ? '' : text);
   const todo = el('span', 'todo', reveal ? text : '');
   p.append(done, todo);
   said.appendChild(p);
-  subtitle = { text, done, todo };
+  subtitle = { text, done, todo, n: reveal ? 0 : text.length };
+  said.scrollTop = 0;
+  if (!reveal) pageThrough();
 }
 function revealTo(n) {
   if (!subtitle) return;
   const { text, done, todo } = subtitle;
   n = Math.max(0, Math.min(text.length, n));
+  const jump = n === text.length && subtitle.n < n && n - subtitle.n > 40;
+  subtitle.n = n;
   done.textContent = text.slice(0, n);
   todo.textContent = text.slice(n);
+  // A long tail revealed at once (a voice without word events) has no
+  // clock to follow: page through it instead of jumping to the end.
+  if (jump) { said.scrollTop = 0; pageThrough(); } else if (!pageTimer) followReveal();
 }
+
+// Lines per page and the line height, from the layout.
+function pageGeometry() {
+  const lh = parseFloat(getComputedStyle(said).lineHeight) || 1;
+  const per = Math.max(1, Math.round(said.clientHeight / lh));
+  const lines = Math.max(1, Math.round(said.scrollHeight / lh));
+  return { lh, per, pages: Math.ceil(lines / per) };
+}
+function showPage(i) {
+  const { lh, per } = pageGeometry();
+  said.scrollTop = i * per * lh;
+}
+// The page holding the last revealed word.
+function followReveal() {
+  if (!subtitle) return;
+  const rects = subtitle.done.getClientRects();
+  if (!rects.length) { said.scrollTop = 0; return; }
+  const { lh, per } = pageGeometry();
+  const top = rects[rects.length - 1].top - said.getBoundingClientRect().top + said.scrollTop;
+  showPage(Math.floor(Math.round(top / lh) / per));
+}
+function pageThrough() {
+  clearInterval(pageTimer);
+  pageTimer = 0;
+  const { pages } = pageGeometry();
+  if (pages <= 1) return;
+  let i = 0;
+  showPage(0);
+  pageTimer = setInterval(() => {
+    i += 1;
+    showPage(i);
+    if (i >= pages - 1) { clearInterval(pageTimer); pageTimer = 0; }
+  }, PAGE_MS);
+}
+// The layout changed (a preset, a rotation): find the place again.
+new ResizeObserver(() => { if (subtitle && !pageTimer) followReveal(); }).observe(said);
+
 function lineDone() {
-  if (subtitle) revealTo(subtitle.text.length);
-  staleTimer = setTimeout(() => said.classList.add('stale'), 10000);
+  if (subtitle && subtitle.n < subtitle.text.length) revealTo(subtitle.text.length);
+  clearTimeout(staleTimer);
+  clearTimeout(goneTimer);
+  staleTimer = setTimeout(() => said.classList.add('stale'), STALE_MS);
+  goneTimer = setTimeout(() => said.classList.add('gone'), GONE_MS);
 }
 // End of the word starting at `i`.
 function wordEnd(text, i) {
@@ -175,7 +244,15 @@ function renderDisplay(d) {
   }
   for (const [card, spec] of drawn) if (spec && spec.mounted) spec.mounted(card);
   for (const spec of Object.values(Kiosk.cards)) if (spec.settle) spec.settle();
+  for (const [card] of drawn) { Kiosk.fitCard(card); cardSizes.observe(card); }
+  if (subtitle && !pageTimer) followReveal();
 }
+
+// A card's room changes with the preset and the other cards: measure
+// what fits again.
+const cardSizes = new ResizeObserver((entries) => {
+  requestAnimationFrame(() => { for (const e of entries) if (e.target.isConnected) Kiosk.fitCard(e.target); });
+});
 
 function unknownCard(card) {
   card.appendChild(el('p', 'empty-note', 'This page doesn’t know that card yet. Reload?'));
@@ -459,22 +536,65 @@ $('#mic').addEventListener('click', () => {
 
 // ---------- events from the display server ----------
 
+// A dropped stream comes back within seconds (the server sends
+// `retry: 2000`); only a link down for longer than LINK_GRACE_MS shows
+// as offline.
+const LINK_GRACE_MS = 5000;
+let downTimer = 0; // pending while the link is down but not yet shown so
+function setLink(up) {
+  $('#link').classList.toggle('up', up);
+  if (up) {
+    clearTimeout(downTimer);
+    downTimer = 0;
+    linkUp = true;
+    render();
+    return;
+  }
+  if (!linkUp || downTimer) return; // already down, or already counting
+  downTimer = setTimeout(() => { downTimer = 0; linkUp = false; render(); }, LINK_GRACE_MS);
+}
+
 function connect() {
   const es = new EventSource('events');
-  const link = $('#link');
-  es.onopen = () => { linkUp = true; link.classList.add('up'); render(); };
+  setLink(false); // until it opens
+  es.onopen = () => setLink(true);
   // EventSource retries on its own; the status line says we're offline.
-  es.onerror = () => { linkUp = false; link.classList.remove('up'); render(); };
+  es.onerror = () => setLink(false);
   const on = (name, fn) => es.addEventListener(name, (e) => {
     let data;
     try { data = JSON.parse(e.data); } catch { return; }
     fn(data);
   });
-  on('display', renderDisplay);
-  on('avatar', (d) => { serverState = d.state; render(); });
-  on('say', enqueue);
+  on('display', (d) => { stir(); renderDisplay(d); });
+  on('avatar', (d) => { stir(); serverState = d.state; render(); });
+  on('say', (d) => { stir(); enqueue(d); });
 }
 connect();
+
+// ---------- night ----------
+
+// After QUIET_MS with nothing said, shown or touched, a veil dims the
+// screen (#app.night; --night-dim) to spare an always-on panel. Any
+// event, speech or touch lifts it.
+const QUIET_MS = 10 * 60000;
+let quietTimer = 0;
+function stir() {
+  app.classList.remove('night');
+  clearTimeout(quietTimer);
+  quietTimer = setTimeout(() => {
+    if (speaking || listening) stir();
+    else app.classList.add('night');
+  }, QUIET_MS);
+}
+document.addEventListener('pointerdown', stir, true);
+stir();
+
+// The browser chrome (theme-color) matches the theme's ground.
+{
+  const meta = document.querySelector('meta[name=theme-color]');
+  const bg = getComputedStyle(document.body).backgroundColor;
+  if (meta && bg) meta.content = bg;
+}
 
 // ---------- settings ----------
 

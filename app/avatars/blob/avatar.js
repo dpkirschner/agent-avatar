@@ -4,7 +4,8 @@
 // The contract every avatar module meets (app.js never looks inside):
 //   window.AvatarFace = {
 //     mount(el)      draw into this element (it fills the avatar column)
-//     state(s)       'idle' | 'listening' | 'thinking' | 'talking'
+//     state(s)       'idle' | 'listening' | 'thinking' | 'talking' |
+//                    'offline' (the display server is out of reach)
 //     mouth(v)       0 (closed) .. 1 (open); called every frame while talking
 //     size(preset)   'chat' | 'split' | 'focus': how much room it has
 //   }
