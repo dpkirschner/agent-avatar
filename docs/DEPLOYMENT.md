@@ -41,7 +41,7 @@ scripts/deploy.sh install vYYYY.MM.N    # terminal (sudo): stop, switch, start, 
 scripts/deploy.sh verify                # no sudo: what's live, checks again
 ```
 
-The install checks: `/healthz`, the page, `/state`, `/screens` (it
+The install checks: `/healthz`, the page, `/state`, `/status`, `/screens` (it
 prints the screen names), that a command without the token gets `401`,
 and that `/version` reports the tag. `scripts/deploy.sh rollback`
 switches back to the previous release; `status` shows what's live and

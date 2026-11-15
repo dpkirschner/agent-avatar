@@ -409,6 +409,7 @@ healthz /healthz
 page /
 state /state
 screens /screens
+status /status
 EOF
   echo "screens: $(/usr/bin/python3 -I -c '
 import json, sys
