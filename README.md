@@ -10,9 +10,8 @@ and speech in and out. You talk to the page; your words go to the
 agent; the agent's replies come back spoken, and it can change what's
 on screen while it works.
 
-**Status: early.** The repo has its build, test and release tooling;
-the page and the display server are being built now. See
-[docs/API.md](docs/API.md) for the planned interface.
+**Status: early.** The page and the display server work; the Matrix
+adapter and local speech are next. See [docs/API.md](docs/API.md).
 
 ## How it fits together
 
@@ -34,12 +33,19 @@ agent ──HTTP (show / sprite / say)──▶ display server ──SSE──�
 ## Quick start
 
 ```
-make serve      # display server on 127.0.0.1:8070
+cp examples/screens.toml screens.toml   # then point it at your pages
+AVATAR_SCREENS=screens.toml make serve  # http://127.0.0.1:8075/
+curl -X POST -H 'Content-Type: application/json' -d '{"text":"Hello."}' http://127.0.0.1:8075/say
 make check      # format, lint, tests, leak scan
 ```
 
+Speech recognition in Safari needs HTTPS, so on a tablet put the
+server behind an HTTPS proxy on a private network; see
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
 Docs: [ARCHITECTURE](docs/ARCHITECTURE.md) ·
 [API](docs/API.md) · [DEVELOPMENT](docs/DEVELOPMENT.md) ·
+[DEPLOYMENT](docs/DEPLOYMENT.md) ·
 [RELEASING](docs/RELEASING.md) · [GLOSSARY](GLOSSARY.md)
 
 ## License

@@ -19,8 +19,12 @@ have here.
 - **Sprite state**: one of `idle`, `listening`, `thinking`, `talking`.
 - **Say**: an agent asks the avatar to speak a line of text. The page
   plays the audio and the sprite is `talking` while it does.
+- **Heard**: a finished utterance the page recognised from the user's
+  speech, sent to `POST /heard` and passed to adapters.
+- **Command token**: the bearer token agents and adapters present to
+  drive the display. The page itself never holds it.
 - **Adapter**: the piece that carries what the user says on the page
   to an agent's chat, and the agent's replies back to the avatar
   (Matrix first).
 - **Event**: one message from the display server to the page over SSE
-  (`show`, `sprite`, `say`).
+  (`show`, `sprite`, `say`), or to an adapter (`heard`).

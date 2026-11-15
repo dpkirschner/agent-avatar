@@ -9,16 +9,17 @@ outflow and vitals repos: same gate, release flow and leak scan.
 - Gate: `make check` (fmt, clippy -D warnings, tests, `make leakscan`).
   Run it before committing.
 - Layout: `server/` (Rust, axum), `app/` (plain HTML/JS, no build
-  step, served as is), `examples/` (synthetic only), `scripts/`
+  step, compiled into the server binary; the page CSP forbids inline
+  scripts and styles), `examples/` (synthetic only), `scripts/`
   (release and leak scan), `docs/`.
 - The repo is public and meant for reuse: no personal details (names,
   hostnames, tailnet names, real paths, real screens) in code, docs,
   fixtures or commit messages. Real screens configs stay outside the
   repo (`/screens.toml` is gitignored).
 - Screens are names from the config, never URLs from the agent.
-- Docs map: ARCHITECTURE (parts, data flow), API (endpoints, events),
-  DEVELOPMENT (build, tests), RELEASING (versions, releases, leak
-  scan). Update the matching doc with any behaviour change, and
+- Docs map: ARCHITECTURE (parts, data flow, config), API (endpoints,
+  events, auth), DEVELOPMENT (build, tests), DEPLOYMENT (launchd,
+  deploy.sh, proxy), RELEASING (versions, releases, leak scan). Update the matching doc with any behaviour change, and
   GLOSSARY.md when a term changes.
 - Leak scan: `scripts/leakscan.py` is a copy of vitals' (outflow has
   the same minus the health rules); port fixes both ways. False

@@ -58,9 +58,10 @@ git-cliff is needed for drafting only (`brew install git-cliff`).
 
 ## Deploying
 
-`scripts/deploy.sh` (build, install as a launchd service, verify,
-rollback), shared with outflow and vitals, arrives with the first
-deployable server.
+`scripts/deploy.sh` builds a published tag and installs it as a launchd
+service; see [DEPLOYMENT.md](DEPLOYMENT.md). It is a trimmed copy of
+vitals' script (no database steps); port fixes to the shared parts
+both ways.
 
 ## Mistakes
 

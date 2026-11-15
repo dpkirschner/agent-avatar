@@ -11,7 +11,7 @@ help: ## List available targets
 server: ## Build the release server binary
 	cargo build --release -p agent-avatar-server
 
-serve: ## Run the server on 127.0.0.1:8070 (AVATAR_ADDR overrides)
+serve: ## Run the server on 127.0.0.1:8075 (AVATAR_ADDR overrides)
 	cargo run -p agent-avatar-server
 
 run: serve ## Alias for serve (the page has no build step)
