@@ -77,7 +77,9 @@ avatar, app.
   slots in `TEMPLATES` (`display.rs`); the same test checks them.
 - **Adding a theme:** a folder `app/themes/<name>/` with `theme.css`.
   Start from `plain` (the neutral defaults) and set tokens; card CSS
-  never names a theme, so every card follows.
+  never names a theme, so every card follows. `DESIGN.md` at the
+  root records the default theme (`picture-book`): its palette, type,
+  shapes and rules for new cards.
 
 - **Layout.** A status line at the top (and one at the bottom when the
   agent sets it), the avatar column on the left, the content column on
