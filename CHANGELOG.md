@@ -5,6 +5,16 @@ from 0 each month). Each section is drafted from commit subjects by
 git-cliff (`cliff.toml`) through `scripts/release.py`; big releases open
 with a short summary. See `docs/RELEASING.md`.
 
+## v2026.11.3 (2026-11-14)
+
+The Matrix adapter: what you say to the tablet goes to the agent's
+Matrix room, and the agent's replies come back spoken.
+
+### Features
+
+- matrix: New `agent-avatar-matrix` binary. Posts each utterance to a room as its own user and speaks the agent's text and notice replies, once each has gone 1.5 s without an edit (`MATRIX_SETTLE_MS`), so a streamed reply is said once. The agent typing turns the sprite `thinking`. It never speaks history, replies older than five minutes, or anyone but the agent; it refuses an end-to-end encrypted room and stops on a rejected token (ho-ru7.7) ([939a2ea](https://github.com/dpkirschner/agent-avatar/commit/939a2ea))
+- deploy: Releases carry both binaries. `deploy.sh setup-matrix` installs the adapter's LaunchDaemon (its access token in a 0600 file in the data dir); install, rollback and `env --restart` stop and start it with the server, and `env --matrix` edits its settings (ho-ru7.7) ([eb25112](https://github.com/dpkirschner/agent-avatar/commit/eb25112))
+
 ## v2026.11.2 (2026-11-14)
 
 ### Fixes
