@@ -1,0 +1,101 @@
+/* Theme `picture-book` (world A, chosen 2026-11-14): a flat cobalt
+   ground, cream pages with a thick ink outline, a sunflower face, and a
+   soft wonky serif (Fraunces) for anything said aloud or titled; body
+   text in Atkinson Hyperlegible Next for reading at a desk's distance.
+   Fonts: OFL, files and licences in fonts/. */
+@font-face { font-family: "Fraunces"; src: url(fonts/fraunces.woff2) format("woff2"); font-weight: 100 900; font-display: block; }
+@font-face { font-family: "Atkinson Hyperlegible Next"; src: url(fonts/atkinson-hyperlegible-next.woff2) format("woff2"); font-weight: 200 800; font-display: block; }
+
+:root {
+  --cobalt: #2340b8;
+  --cream: #fbf3e2;
+  --ink: #17173a;
+  --sun: #ffc83d;
+  --tomato: #e2462b;
+
+  --bg: var(--cobalt);
+  --fg: var(--cream);
+  --dim: #d3daf8;
+  --acc: var(--sun);
+  --good: #2f7d52;
+  --warn: #c0700f;
+  --bad: var(--tomato);
+  --font-body: "Atkinson Hyperlegible Next", system-ui, sans-serif;
+  --font-display: "Fraunces", Georgia, serif;
+  --display-axes: "SOFT" 100, "WONK" 1;
+  --gap: 18px;
+
+  --status-h: 40px;
+  --status-fg: var(--dim);
+  --status-size: 15px;
+  --status-weight: 600;
+  --status-rule: 0;
+
+  --said-size: 30px;
+  --said-weight: 560;
+  --said-fg: var(--cream);
+
+  --mic-bg: var(--cream);
+  --mic-fg: var(--ink);
+  --mic-border: 3px solid var(--ink);
+  --mic-shadow: 0 4px 0 0 var(--ink);
+  --mic-on-bg: var(--sun);
+  --mic-on-fg: var(--ink);
+
+  --card-bg: var(--cream);
+  --card-fg: var(--ink);
+  --card-dim: #55546f;
+  --card-line: #e6dcc6;
+  --card-border: 3px solid var(--ink);
+  --card-radius: 22px;
+  --card-pad: 16px 20px 18px;
+  --title-size: 23px;
+  --title-weight: 640;
+  --title-case: none;
+  --title-tracking: 0;
+  --title-fg: var(--ink);
+  --value-size: 44px;
+  --value-weight: 700;
+  --fill: var(--sun);
+  --mark: var(--ink);
+  --mark-line: 2.5px;
+  --hl: var(--sun);
+  --hl-opacity: .35;
+  --plot-line: 4px;
+  --s1: var(--cobalt); --s2: var(--tomato); --s3: #b8860b; --s4: var(--good);
+
+  --claim-bg: var(--tomato);
+  --claim-fg: var(--cream);
+  --claim-border: 3px solid var(--ink);
+
+  --overlay-bg: rgba(35, 64, 184, .95);
+
+  --face-idle: var(--sun);
+  --face-listening: #ffd866;
+  --face-thinking: #f5b52a;
+  --face-talking: var(--sun);
+  --face-line: var(--ink);
+  --face-line-w: 6px;
+  --face-eye: #fffaf0;
+  --face-ink: var(--ink);
+  --face-ring: var(--cream);
+  --face-dots: var(--cream);
+}
+::selection { background: var(--sun); color: var(--ink); }
+
+/* signature touches beyond the tokens */
+#agent-state { font-family: var(--font-display); font-variation-settings: var(--display-axes); font-size: 17px; color: var(--fg); }
+#link { box-shadow: 0 0 0 2px var(--ink); }
+#heard.note { color: var(--sun); }
+#stage { padding-top: 6px; }
+/* bars: the highlighted bar in sunflower, the rest cream, all outlined */
+.card-chart .bar.s1 { fill: var(--sun); }
+.card-chart .bar.dim { opacity: 1; fill: var(--cream); }
+.card-chart .hl-line { stroke: var(--ink); stroke-dasharray: none; }
+.card-chart .hl-dot { stroke: var(--ink); stroke-width: 3; }
+.card-chart .grid line { stroke-width: 1.5; }
+#start-btn { border: 3px solid var(--ink); box-shadow: 0 5px 0 0 var(--ink); }
+.panel button { border: 2.5px solid var(--ink); }
+.panel select, .panel input[type=password] { background: #fff; color: var(--ink); border: 2px solid var(--ink); }
+.status .item.hot { color: var(--sun); }
+.goal .bar { background: var(--cream); }

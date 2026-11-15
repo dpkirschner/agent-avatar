@@ -186,8 +186,8 @@ enum Slot {
 }
 
 /// The built-in status templates and their slots. The page draws each
-/// template its own way (`app/app.js`, `STATUS_TEMPLATES`); keep the two
-/// lists in step.
+/// template its own way (`app/status/<name>/status.js`); a test keeps the
+/// two lists in step.
 const TEMPLATES: &[(&str, &[(&str, Slot)])] = &[
     (
         "desk",
@@ -262,6 +262,9 @@ impl Scalar {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
+/// A card the agent can send. Each type has a page module in
+/// `app/cards/<type>/`; `CARD_TYPES` lists the same names, and a test
+/// checks the two agree.
 pub enum Card {
     Text(TextCard),
     List(ListCard),
@@ -273,6 +276,20 @@ pub enum Card {
     Transcript(TranscriptCard),
     Screen(ScreenCard),
 }
+
+/// The `type` names of `Card`, in the same order (checked in tests).
+#[cfg(test)]
+pub const CARD_TYPES: &[&str] = &[
+    "text",
+    "list",
+    "figures",
+    "alerts",
+    "calendar",
+    "goals",
+    "chart",
+    "transcript",
+    "screen",
+];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -745,6 +762,24 @@ mod tests {
     }
 
     #[test]
+    fn page_modules_match_the_cards_and_templates_checked_here() {
+        let mut types = CARD_TYPES.to_vec();
+        types.sort();
+        assert_eq!(
+            types,
+            crate::assets::names("cards", "card.js"),
+            "app/cards/<type>/ must match Card (CARD_TYPES)"
+        );
+        let mut names: Vec<&str> = TEMPLATES.iter().map(|(n, _)| *n).collect();
+        names.sort();
+        assert_eq!(
+            names,
+            crate::assets::names("status", "status.js"),
+            "app/status/<name>/ must match TEMPLATES"
+        );
+    }
+
+    #[test]
     fn every_card_type_accepts_a_good_example() {
         let good = [
             json!({"type": "text", "title": "Note", "body": "One.\n\nTwo."}),
@@ -757,6 +792,8 @@ mod tests {
             json!({"type": "transcript", "lines": 10}),
             json!({"type": "screen", "name": "status"}),
         ];
+        let seen: Vec<&str> = good.iter().map(|v| v["type"].as_str().unwrap()).collect();
+        assert_eq!(seen, CARD_TYPES, "one good example per Card type, in order");
         for v in good {
             card(v.clone()).unwrap_or_else(|e| panic!("{v}: {e}"));
         }

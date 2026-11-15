@@ -12,8 +12,16 @@ have here.
   `split` or `focus`. The agent picks one; the page owns the geometry.
 - **Card**: one typed block of content (text, list, figures, alerts,
   calendar, goals, chart, transcript, screen). At most three at once.
+  Each type is a card module, `app/cards/<type>/`.
+- **Theme**: how the page looks: colours, type, surfaces, and how the
+  avatar is dressed. A folder `app/themes/<name>/` that sets the style
+  tokens; chosen with `AVATAR_THEME`. The first is `picture-book`.
+- **Token**: a named style value (`--card-bg`, `--font-display`, ...)
+  declared in `app/core/layout.css`. Cards and the layout use only
+  tokens; themes set them.
 - **Status line**: the thin band at the top or bottom, drawn from a
-  built-in template with the agent's values in its slots.
+  built-in template (`app/status/<name>/`) with the agent's values in
+  its slots.
 - **Subtitles**: the agent's current line under the avatar, revealed
   word by word as it speaks.
 - **Kiosk page**: the full-screen web page that renders the avatar on

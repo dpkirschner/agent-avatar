@@ -1,0 +1,12 @@
+.card-figures .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px 16px; }
+.figure { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.figure .label { color: var(--card-dim); font-size: 15px; }
+.figure .value {
+  font-family: var(--font-display); font-variation-settings: var(--display-axes);
+  font-size: var(--value-size); font-weight: var(--value-weight); line-height: 1.05;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.figure .unit { font-family: var(--font-body); font-size: 16px; color: var(--card-dim); margin-left: 4px; font-weight: 400; }
+.figure .delta { font-size: 15px; color: var(--card-dim); font-variant-numeric: tabular-nums; }
+.figure .delta.good { color: var(--good); }
+.figure .delta.bad { color: var(--bad); }

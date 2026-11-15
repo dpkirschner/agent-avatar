@@ -10,9 +10,9 @@
 // Handlers return a ready `Response` as the error; boxing it buys nothing.
 #![allow(clippy::result_large_err)]
 
-use crate::config::{ParamRule, Screen};
+use crate::config::{Look, ParamRule, Screen};
 use crate::display::{self, Avatar, Display, DisplayPatch};
-use axum::extract::{Json, Path, Request, State};
+use axum::extract::{Json, Request, State};
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::middleware::{self, Next};
 use axum::response::sse::{Event, KeepAlive, Sse};
@@ -36,16 +36,6 @@ pub const MAX_HEARD_CHARS: usize = 1000;
 const SSE_RETRY: Duration = Duration::from_secs(2);
 
 const INDEX_HTML: &str = include_str!("../../app/index.html");
-const APP_JS: &str = include_str!("../../app/app.js");
-const APP_CSS: &str = include_str!("../../app/app.css");
-
-/// The built-in avatars' files, by name: (name, avatar.js, avatar.css).
-/// `config::FACES` lists the same names.
-const FACE_FILES: &[(&str, &str, &str)] = &[(
-    "blob",
-    include_str!("../../app/avatars/blob/avatar.js"),
-    include_str!("../../app/avatars/blob/avatar.css"),
-)];
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Said {
@@ -93,8 +83,9 @@ struct Current {
 pub struct AppState {
     screens: Vec<Screen>,
     token: Option<String>,
-    /// The avatar the page draws (a name from `config::FACES`).
-    face: String,
+    /// The page's `<head>` tags: layout, cards, status templates, and
+    /// the configured theme and avatar (`assets::head`).
+    head: String,
     current: Mutex<Current>,
     page_tx: broadcast::Sender<PageEvent>,
     heard_tx: broadcast::Sender<Heard>,
@@ -104,13 +95,13 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new(screens: Vec<Screen>, token: Option<String>, face: String) -> Arc<Self> {
+    pub fn new(screens: Vec<Screen>, token: Option<String>, look: Look) -> Arc<Self> {
         let (page_tx, _) = broadcast::channel(64);
         let (heard_tx, _) = broadcast::channel(64);
         Arc::new(AppState {
             screens,
             token,
-            face,
+            head: crate::assets::head(&look.theme, &look.face),
             current: Mutex::new(Current {
                 display: Display::default(),
                 avatar: Avatar::Idle,
@@ -146,12 +137,6 @@ type Shared = Arc<AppState>;
 pub fn router(state: Shared) -> Router {
     Router::new()
         .route("/", get(index))
-        .route(
-            "/app.js",
-            get(|| async { asset(APP_JS, "text/javascript") }),
-        )
-        .route("/app.css", get(|| async { asset(APP_CSS, "text/css") }))
-        .route("/avatars/{face}/{file}", get(face_asset))
         .route("/healthz", get(|| async { "ok" }))
         .route("/version", get(version))
         .route("/status", get(status))
@@ -159,6 +144,7 @@ pub fn router(state: Shared) -> Router {
         .route("/screens", get(get_screens))
         .route("/events", get(events))
         .merge(commands(state.clone()))
+        .fallback(get(page_file))
         .with_state(state)
 }
 
@@ -184,7 +170,13 @@ async fn require_token(State(st): State<Shared>, req: Request, next: Next) -> Re
 
 // ---------- page ----------
 
-fn asset(body: &'static str, content_type: &'static str) -> Response {
+/// A page file from `app/` (embedded), by its path under `app/`.
+async fn page_file(uri: axum::http::Uri) -> Response {
+    let path = uri.path().trim_start_matches('/');
+    let found = crate::assets::content_type(path).zip(crate::assets::get(path));
+    let Some((content_type, body)) = found else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
     (
         [
             (header::CONTENT_TYPE, content_type),
@@ -196,23 +188,11 @@ fn asset(body: &'static str, content_type: &'static str) -> Response {
         .into_response()
 }
 
-/// A built-in avatar's `avatar.js` or `avatar.css`.
-async fn face_asset(Path((face, file)): Path<(String, String)>) -> Response {
-    let Some((_, js, css)) = FACE_FILES.iter().find(|(n, _, _)| *n == face) else {
-        return StatusCode::NOT_FOUND.into_response();
-    };
-    match file.as_str() {
-        "avatar.js" => asset(js, "text/javascript"),
-        "avatar.css" => asset(css, "text/css"),
-        _ => StatusCode::NOT_FOUND.into_response(),
-    }
-}
-
-/// The kiosk page, with the configured avatar's files linked in, and a
+/// The kiosk page, with its folders' files linked in, and a
 /// CSP that frames only the configured screens' origins and lets nothing
 /// frame the page itself.
 async fn index(State(st): State<Shared>) -> Response {
-    let html = INDEX_HTML.replace("{{face}}", &st.face);
+    let html = INDEX_HTML.replace("{{head}}", &st.head);
     let mut res = (
         [
             (header::CONTENT_TYPE, "text/html; charset=utf-8"),
@@ -511,7 +491,11 @@ mod tests {
     }
 
     fn app(token: Option<&str>) -> (Router, Shared) {
-        let st = AppState::new(screens(), token.map(String::from), "blob".into());
+        let look = Look {
+            theme: crate::config::DEFAULT_THEME.into(),
+            face: crate::config::DEFAULT_FACE.into(),
+        };
+        let st = AppState::new(screens(), token.map(String::from), look);
         (router(st.clone()), st)
     }
 
@@ -527,7 +511,7 @@ mod tests {
         let res = app.clone().oneshot(req).await.unwrap();
         let status = res.status();
         let body = res.into_body().collect().await.unwrap().to_bytes();
-        (status, String::from_utf8(body.to_vec()).unwrap())
+        (status, String::from_utf8_lossy(&body).into_owned())
     }
 
     async fn get(app: &Router, path: &str) -> (StatusCode, String) {
@@ -643,25 +627,36 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn serves_the_configured_face() {
+    async fn serves_the_page_assembled_from_its_folders() {
         let (app, _) = app(None);
         let (s, html) = get(&app, "/").await;
         assert_eq!(s, StatusCode::OK);
-        assert!(html.contains("avatars/blob/avatar.js"));
-        assert!(!html.contains("{{face}}"));
-        assert_eq!(get(&app, "/avatars/blob/avatar.js").await.0, StatusCode::OK);
-        assert_eq!(
-            get(&app, "/avatars/blob/avatar.css").await.0,
-            StatusCode::OK
-        );
-        assert_eq!(
-            get(&app, "/avatars/nope/avatar.js").await.0,
-            StatusCode::NOT_FOUND
-        );
-        assert_eq!(
-            get(&app, "/avatars/blob/x.js").await.0,
-            StatusCode::NOT_FOUND
-        );
+        assert!(!html.contains("{{head}}"));
+        for f in [
+            "core/app.js",
+            "cards/chart/card.js",
+            "status/desk/status.js",
+            "avatars/blob/avatar.js",
+            "themes/picture-book/theme.css",
+        ] {
+            assert!(html.contains(f), "{f} not linked");
+            assert_eq!(get(&app, &format!("/{f}")).await.0, StatusCode::OK, "{f}");
+        }
+        assert!(!html.contains("themes/plain/"));
+        let font = "/themes/picture-book/fonts/fraunces.woff2";
+        assert_eq!(get(&app, font).await.0, StatusCode::OK);
+        for missing in [
+            "/index.html",
+            "/avatars/nope/avatar.js",
+            "/core/x.js",
+            "/../Cargo.toml",
+        ] {
+            assert_eq!(
+                get(&app, missing).await.0,
+                StatusCode::NOT_FOUND,
+                "{missing}"
+            );
+        }
     }
 
     #[tokio::test]
@@ -703,7 +698,14 @@ mod tests {
             assert_eq!(s, StatusCode::UNAUTHORIZED, "{path} bare POST");
         }
         // The page's own routes stay open.
-        for path in ["/", "/app.js", "/state", "/screens", "/healthz", "/status"] {
+        for path in [
+            "/",
+            "/core/app.js",
+            "/state",
+            "/screens",
+            "/healthz",
+            "/status",
+        ] {
             assert_eq!(get(&app, path).await.0, StatusCode::OK, "{path}");
         }
     }

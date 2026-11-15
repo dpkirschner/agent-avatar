@@ -6,8 +6,10 @@
 //! Binds loopback by default; `tailscale serve` (or any reverse proxy)
 //! is the network boundary. Environment: `AVATAR_ADDR` (address),
 //! `AVATAR_SCREENS` (screens config), `AVATAR_TOKEN_FILE` or
-//! `AVATAR_TOKEN` (command token), `AVATAR_FACE` (avatar, default blob).
+//! `AVATAR_TOKEN` (command token), `AVATAR_THEME` (look, default
+//! picture-book), `AVATAR_FACE` (avatar, default blob).
 
+mod assets;
 mod config;
 mod display;
 mod routes;
@@ -28,14 +30,19 @@ async fn main() {
         .init();
     let screens = config::load_screens().unwrap_or_else(|e| die(e));
     let token = config::load_token().unwrap_or_else(|e| die(e));
-    let face = config::load_face().unwrap_or_else(|e| die(e));
+    let look = config::load_look().unwrap_or_else(|e| die(e));
     if token.is_none() {
         tracing::warn!(
             "no AVATAR_TOKEN_FILE: anything that can reach the port can drive the display"
         );
     }
-    tracing::info!(screens = screens.len(), face = %face, "screens loaded");
-    let state = routes::AppState::new(screens, token, face);
+    tracing::info!(
+        screens = screens.len(),
+        theme = %look.theme,
+        face = %look.face,
+        "screens loaded"
+    );
+    let state = routes::AppState::new(screens, token, look);
     let addr = std::env::var("AVATAR_ADDR").unwrap_or_else(|_| DEFAULT_ADDR.to_string());
     let listener = match tokio::net::TcpListener::bind(&addr).await {
         Ok(l) => l,

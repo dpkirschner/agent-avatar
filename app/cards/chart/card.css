@@ -1,0 +1,20 @@
+.card-chart .plot { flex: 1 1 auto; min-height: 120px; position: relative; }
+.card-chart svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.card-chart .legend { display: inline-flex; gap: 12px; text-transform: none; letter-spacing: 0; font-family: var(--font-body); font-weight: 400; font-size: 14px; }
+.card-chart .legend span::before { content: ""; display: inline-block; width: 10px; height: 3px; margin-right: 5px; vertical-align: middle; background: currentColor; }
+.card-chart .grid line { stroke: var(--card-line); stroke-width: 1; }
+.card-chart .axis text { fill: var(--card-dim); font-size: 13px; font-variant-numeric: tabular-nums; }
+.card-chart .line { fill: none; stroke-width: var(--plot-line); stroke-linejoin: round; stroke-linecap: round; }
+.card-chart .bar { stroke: var(--mark); stroke-width: var(--mark-line); }
+.card-chart .bar.dim { opacity: .4; }
+.card-chart .hl-band { fill: var(--hl); opacity: var(--hl-opacity); }
+.card-chart .hl-line { stroke: var(--card-fg); stroke-width: 1.5; stroke-dasharray: 3 4; }
+.card-chart .hl-dot { stroke: var(--card-bg); stroke-width: 2.5; }
+.card-chart .s1 { color: var(--s1); stroke: var(--s1); fill: var(--s1); }
+.card-chart .s2 { color: var(--s2); stroke: var(--s2); fill: var(--s2); }
+.card-chart .s3 { color: var(--s3); stroke: var(--s3); fill: var(--s3); }
+.card-chart .s4 { color: var(--s4); stroke: var(--s4); fill: var(--s4); }
+.card-chart .line.s1, .card-chart .line.s2, .card-chart .line.s3, .card-chart .line.s4 { fill: none; }
+.card-chart .legend span { stroke: none; fill: none; }
+.card-chart .bar { stroke: var(--mark); }
+.card-chart .hl-dot { stroke: var(--card-bg); }

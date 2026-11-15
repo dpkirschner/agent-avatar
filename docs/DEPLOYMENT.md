@@ -25,7 +25,7 @@ This creates `~/Library/Application Support/agent-avatar/` (0700) with:
 
 and `/Library/LaunchDaemons/com.agent-avatar.server.plist` (root:wheel
 644), which runs `releases/current/agent-avatar-server` as you, with
-`AVATAR_ADDR`, `AVATAR_SCREENS` and `AVATAR_TOKEN_FILE` set, logging to
+`AVATAR_ADDR`, `AVATAR_SCREENS` and `AVATAR_TOKEN_FILE` set (optionally `AVATAR_THEME`, `AVATAR_FACE`), logging to
 `~/Library/Logs/agent-avatar.log`. Nothing starts until the first
 install. Each release holds both binaries, the server and the Matrix
 adapter; the adapter only runs once `setup-matrix` installs its plist

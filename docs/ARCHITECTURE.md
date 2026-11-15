@@ -36,32 +36,64 @@ Configuration (environment, read once at startup):
 | `AVATAR_SCREENS` | Path of the screens config. Unset: no screens. Unreadable or invalid: the server refuses to start. |
 | `AVATAR_TOKEN_FILE` | 0600 file holding the command token (preferred). |
 | `AVATAR_TOKEN` | The token itself, if a file isn't practical. |
+| `AVATAR_THEME` | Which built-in theme the page wears (`app/themes/<name>/`), default `picture-book`. Unknown: the server refuses to start. |
 | `AVATAR_FACE` | Which built-in avatar the page draws (`app/avatars/<name>/`), default `blob`. Unknown: the server refuses to start. |
 | `RUST_LOG` | Log filter, default `info`. |
 
-Source: `server/src/config.rs` (screens, token, face),
+Source: `server/src/config.rs` (screens, token, look),
+`server/src/assets.rs` (the embedded page, its `<head>`),
 `server/src/display.rs` (card and status checks, presets),
 `server/src/routes.rs` (state, routes, SSE), `server/src/main.rs` (startup).
 
 ## Kiosk page (`app/`)
 
-Plain HTML, CSS and JS (no npm, no bundler; `app/index.html`,
-`app.js`, `app.css`, one folder per avatar under `app/avatars/`). It
-draws the display, listens to the SSE stream, plays speech, and runs
-the browser's speech recognition for what the user says.
+Plain HTML, CSS and JS (no npm, no bundler). It draws the display,
+listens to the SSE stream, plays speech, and runs the browser's speech
+recognition for what the user says. The page is assembled from
+folders, so components and looks come and go without touching the
+rest:
+
+| Folder | Holds |
+|---|---|
+| `app/core/` | `kit.js` (shared helpers and the card/status registry), `app.js` (layout, speech, SSE, settings), `layout.css` (structure, and every style token with neutral defaults). |
+| `app/cards/<type>/` | `card.js` registers the card with `Kiosk.card(type, {render, claims?, mounted?, history?, settle?})`; `card.css` styles it with the tokens only. |
+| `app/status/<name>/` | `status.js` registers a status template with `Kiosk.status(name, items => [...])`. |
+| `app/themes/<name>/` | `theme.css` sets the tokens and adds the theme's own touches; its fonts (with licences) beside it. |
+| `app/avatars/<name>/` | `avatar.js` and `avatar.css` (below). |
+
+`server/build.rs` embeds the whole of `app/`; the server serves any
+embedded `.js`, `.css`, font, image or text file by its path, and fills
+`{{head}}` in `index.html` with every card and status module, the
+configured theme (CSS last, so it wins) and the configured avatar.
+Scripts are `defer` and run in order: kit, cards, status templates,
+avatar, app.
+
+- **Adding a card:** a folder `app/cards/<type>/` with `card.js` and
+  `card.css`, and the server's check for it (a `Card` variant and its
+  name in `CARD_TYPES`, `server/src/display.rs`). A test fails until
+  the page folders and the server's list agree. Removing one is the
+  same in reverse.
+- **Adding a status template:** a folder `app/status/<name>/` and its
+  slots in `TEMPLATES` (`display.rs`); the same test checks them.
+- **Adding a theme:** a folder `app/themes/<name>/` with `theme.css`.
+  Start from `plain` (the neutral defaults) and set tokens; card CSS
+  never names a theme, so every card follows.
 
 - **Layout.** A status line at the top (and one at the bottom when the
   agent sets it), the avatar column on the left, the content column on
   the right. The preset sets the proportions (`chat` 62/38, `split`
   half each, `focus` 24/76); with no cards the avatar has the whole
   stage. In portrait the columns become rows.
-- **Status lines.** `STATUS_TEMPLATES` in `app.js` draws each template
-  (the server checks the slots); the page adds the agent's state, the
+- **Status lines.** Each template's module draws its items (the server
+  checks the slots); the page adds the agent's state, the
   connection dot and the clock. A dropped stream shows "offline" there,
   never a blank screen.
-- **Cards.** Built from DOM nodes with `textContent` only. Charts are
-  SVG drawn at the card's pixel size and redrawn on resize. A `screen`
-  card is an iframe, kept across redraws while its URL stays.
+- **Cards.** Built from DOM nodes with `textContent` only, by each
+  card's module. A card whose module `claims` it (a `screen`, an
+  `alerts` card with a `crit` item) takes the content area alone.
+  Charts are SVG drawn at the card's pixel size and redrawn on resize.
+  A `screen` card is an iframe, kept across redraws while its URL
+  stays.
 - **Subtitles.** The agent's current line sits under the avatar,
   revealed word by word (browser voice: boundary events; server audio:
   `words` timings on the audio clock; neither: the whole line). The
@@ -73,12 +105,13 @@ the browser's speech recognition for what the user says.
 - **Avatar module.** `app/avatars/<name>/avatar.js` sets
   `window.AvatarFace = {mount(el), state(s), mouth(v), size(preset)}`;
   its CSS stays under its own class. The page never looks inside it,
-  so swapping the avatar touches nothing else. What shows is `talking`
+  so swapping the avatar touches nothing else; a theme dresses it only
+  through the `--face-*` variables the avatar's CSS declares. What shows is `talking`
   while the page is speaking, else `listening` while the mic is on,
   else the server's avatar state. While talking the page drives
   `mouth` every frame: a word boundary opens it, and with no
   boundaries it moves on a gentle loop. To add one: a folder with both
-  files, plus its name in `config::FACES` and `routes::FACE_FILES`.
+  files; nothing else.
 - **Speech out.** `say` lines queue and play in order: `audio` through
   one reused `<audio>` element, else `speechSynthesis`. The mic pauses
   while the avatar talks so it doesn't hear itself. Lines that arrive

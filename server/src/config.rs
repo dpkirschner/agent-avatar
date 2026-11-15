@@ -108,9 +108,6 @@ fn is_day(s: &str) -> bool {
     (1..=days).contains(&d)
 }
 
-/// The avatars built into the page, by name (`app/avatars/<name>/`).
-pub const FACES: &[&str] = &["blob"];
-
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ScreensFile {
@@ -183,15 +180,35 @@ pub fn load_screens() -> Result<Vec<Screen>, String> {
     parse_screens(&text).map_err(|e| format!("AVATAR_SCREENS {path}: {e}"))
 }
 
-/// The avatar to draw, from `AVATAR_FACE` (default `blob`). An unknown
-/// name stops the server.
-pub fn load_face() -> Result<String, String> {
-    let face = std::env::var("AVATAR_FACE").unwrap_or_else(|_| FACES[0].to_string());
-    if FACES.contains(&face.as_str()) {
-        Ok(face)
-    } else {
-        Err(format!("AVATAR_FACE {face:?}: have {}", FACES.join(", ")))
-    }
+/// How the page looks: a theme (`app/themes/<name>/`) and an avatar
+/// (`app/avatars/<name>/`), both built into the binary.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Look {
+    pub theme: String,
+    pub face: String,
+}
+
+/// The theme used when `AVATAR_THEME` is unset.
+pub const DEFAULT_THEME: &str = "picture-book";
+/// The avatar used when `AVATAR_FACE` is unset.
+pub const DEFAULT_FACE: &str = "blob";
+
+/// The look from `AVATAR_THEME` and `AVATAR_FACE`. An unknown name
+/// stops the server, listing the built-in ones.
+pub fn load_look() -> Result<Look, String> {
+    let pick = |var: &str, dir: &str, file: &str, default: &str| {
+        let have = crate::assets::names(dir, file);
+        let name = std::env::var(var).unwrap_or_else(|_| default.to_string());
+        if have.contains(&name.as_str()) {
+            Ok(name)
+        } else {
+            Err(format!("{var} {name:?}: have {}", have.join(", ")))
+        }
+    };
+    Ok(Look {
+        theme: pick("AVATAR_THEME", "themes", "theme.css", DEFAULT_THEME)?,
+        face: pick("AVATAR_FACE", "avatars", "avatar.js", DEFAULT_FACE)?,
+    })
 }
 
 /// The command token, from `AVATAR_TOKEN_FILE` (a 0600 file, preferred)
