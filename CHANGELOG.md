@@ -5,6 +5,12 @@ from 0 each month). Each section is drafted from commit subjects by
 git-cliff (`cliff.toml`) through `scripts/release.py`; big releases open
 with a short summary. See `docs/RELEASING.md`.
 
+## v2026.11.8 (2026-11-14)
+
+### Features
+
+- deploy: `verify` now shows the Matrix adapter's state (loaded, pid, started from the live release) and checks `--matrix-log` patterns in the adapter's log since its start, so "adapter up" no longer reads NOT FOUND after a good restart (ho-g6t) ([04b8774](https://github.com/dpkirschner/agent-avatar/commit/04b8774))
+
 ## v2026.11.7 (2026-11-14)
 
 ### Features
