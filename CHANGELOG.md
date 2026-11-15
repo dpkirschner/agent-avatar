@@ -5,6 +5,14 @@ from 0 each month). Each section is drafted from commit subjects by
 git-cliff (`cliff.toml`) through `scripts/release.py`; big releases open
 with a short summary. See `docs/RELEASING.md`.
 
+## v2026.11.1 (2026-11-14)
+
+The first deployed release; v2026.11.0 was tagged but never installed.
+
+### Fixes
+
+- server: Check the command token before reading the body, so a tokenless command gets 401 rather than 415 (ho-ru7.6) ([c9d6fc9](https://github.com/dpkirschner/agent-avatar/commit/c9d6fc9))
+
 ## v2026.11.0 (2026-11-14)
 
 First tagged release: a full-screen avatar page for a tablet kiosk and the
