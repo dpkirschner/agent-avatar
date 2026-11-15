@@ -5,6 +5,12 @@ from 0 each month). Each section is drafted from commit subjects by
 git-cliff (`cliff.toml`) through `scripts/release.py`; big releases open
 with a short summary. See `docs/RELEASING.md`.
 
+## v2026.11.2 (2026-11-14)
+
+### Fixes
+
+- server: `POST /heard` needs the command token, like the commands. Its text reaches the agent as if the owner said it, so a tailnet device without the token could otherwise speak for the owner. The page asks for the token on the first start tap (a Token field in settings), keeps it, and reopens settings if the server refuses it (ho-ru7.6) ([33ec945](https://github.com/dpkirschner/agent-avatar/commit/33ec945), [ced3f71](https://github.com/dpkirschner/agent-avatar/commit/ced3f71), [24ba3a1](https://github.com/dpkirschner/agent-avatar/commit/24ba3a1))
+
 ## v2026.11.1 (2026-11-14)
 
 The first deployed release; v2026.11.0 was tagged but never installed.
