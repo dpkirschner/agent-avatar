@@ -9,6 +9,7 @@
       for (const para of c.body.split(/\n\s*\n/)) body.appendChild(el('p', '', para.trim()));
       card.appendChild(body);
       card.classList.add('fit');
+      card.dataset.shrink = '15';
     },
   });
 })();

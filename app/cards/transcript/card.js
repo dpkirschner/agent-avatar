@@ -17,10 +17,10 @@
   Kiosk.card('transcript', {
     render(card, c) {
       head(card, 'Transcript');
-      card.appendChild(el('ul', 'scroll'));
+      card.appendChild(el('ul', 'scroll from-end'));
       card._lines = c.lines || HISTORY_MAX;
       fill(card);
     },
-    history: fill,
+    history(card) { fill(card); Kiosk.fitCard(card); },
   });
 })();
