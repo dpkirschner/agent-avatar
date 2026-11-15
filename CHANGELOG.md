@@ -5,6 +5,29 @@ from 0 each month). Each section is drafted from commit subjects by
 git-cliff (`cliff.toml`) through `scripts/release.py`; big releases open
 with a short summary. See `docs/RELEASING.md`.
 
+## v2026.11.9 (2026-11-15)
+
+The page, tuned for an unattended wall tablet after a design review at
+iPad Air landscape size.
+
+### Fixes
+
+- page: long spoken lines page three lines at a time and follow the
+  speech; after 5 s without the server an "Offline" pill, a sleeping
+  face and dimmed cards; the old line fades after 3 minutes and the
+  screen dims after 10 quiet minutes; the mic lights only while the page
+  listens (ho-s5y) ([ae0c79e](https://github.com/dpkirschner/agent-avatar/commit/ae0c79e))
+- cards: cut-off cards fade and lists show "+N more"; sentence-case
+  labels at 15px; AA contrast with a deeper tomato; round chart ticks
+  with month names; alert levels differ by shape (ho-s5y) ([2a60dd1](https://github.com/dpkirschner/agent-avatar/commit/2a60dd1))
+- screen: a "Loading…" / "Can't reach" panel behind each screen, which
+  retries every minute; the page CSP now lists screen origins in
+  `connect-src` for the reachability probe (ho-s5y) ([7335787](https://github.com/dpkirschner/agent-avatar/commit/7335787))
+
+### Docs
+
+- Offline, night and overflow states; new tokens (ho-s5y) ([90a08df](https://github.com/dpkirschner/agent-avatar/commit/90a08df))
+
 ## v2026.11.8 (2026-11-14)
 
 ### Features
