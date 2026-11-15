@@ -329,6 +329,12 @@ becomes an "Offline" pill: Cream on Tomato Deep, ringed in Ink.
 A cream card (22px, outlined) on a 95% cobalt overlay; buttons outlined
 2.5px, fields white with a 2px Ink outline.
 
+### Debug log
+A diagnostic panel, off by default (Settings › Debug log): the card
+ground down the right edge under the top status line, 12px monospace
+lines (time, event, details), event names in good, warn or bad ink.
+The stage narrows to make room. It's a tool, not part of the kiosk look.
+
 ### The face (signature)
 The `blob` avatar, dressed only through `--face-*` variables: a Sunflower
 body with a 6px Ink outline, eye whites, Ink pupils and mouth. Idle
