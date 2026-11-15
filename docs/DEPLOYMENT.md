@@ -111,6 +111,12 @@ next install. From then on `install`, `rollback` and
 `scripts/deploy.sh env --matrix ...` edits its settings. Quote the room
 id: `!` means something to the shell.
 
+`scripts/deploy.sh verify` then also shows the adapter: loaded or not,
+its pid, and whether it was started from the live release.
+`--matrix-log RE` looks for a pattern in the adapter's log since it last
+started (`--log` reads only the display server's log), e.g.
+`scripts/deploy.sh verify --matrix-log 'adapter up'`.
+
 ## 6. Screens that allow framing
 
 Each page in the screens config must allow being framed by the
