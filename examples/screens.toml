@@ -1,0 +1,13 @@
+# Synthetic example screens config. Copy to ./screens.toml (gitignored)
+# and point the entries at your own pages. The agent calls
+# `show <name>` with one of these names.
+
+[[screen]]
+name = "status"
+title = "Status"
+url = "https://status.example.com/"
+
+[[screen]]
+name = "weather"
+title = "Weather"
+url = "https://weather.example.com/today"

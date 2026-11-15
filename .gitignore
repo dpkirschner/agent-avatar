@@ -1,0 +1,21 @@
+/target
+**/*.rs.bk
+.DS_Store
+
+# Secrets / local env
+.env*
+*.pem
+*.key
+
+# Your real screens config stays out of the repo; examples/ holds the
+# synthetic one.
+/screens.toml
+
+# Session handoff notes (kept out of git intentionally)
+agent.md
+
+# Python bytecode from the scripts/ tests
+__pycache__/
+
+# Claude Code per-project permissions: can hold typed tokens
+.claude/settings.local.json
