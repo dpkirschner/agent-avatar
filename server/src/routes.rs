@@ -102,8 +102,9 @@ pub struct AppState {
     current: Mutex<Current>,
     page_tx: broadcast::Sender<PageEvent>,
     heard_tx: broadcast::Sender<Heard>,
-    /// When the last page stream ended, for `/status`.
-    page_left: Mutex<Option<Instant>>,
+    /// When the last page stream ended (server start until one has),
+    /// for `/status`.
+    page_left: Mutex<Instant>,
 }
 
 impl AppState {
@@ -121,7 +122,7 @@ impl AppState {
             }),
             page_tx,
             heard_tx,
-            page_left: Mutex::new(None),
+            page_left: Mutex::new(Instant::now()),
         })
     }
 
@@ -291,17 +292,19 @@ async fn get_screens(State(st): State<Shared>) -> Response {
 }
 
 /// What a monitor needs: pages and adapters connected now, and seconds
-/// since a page was last connected (0 while one is; null if none ever
-/// was). Counts only, no content, so it's open like `/healthz`.
+/// since a page was last connected (0 while one is; since the server
+/// started if none has been, so a monitor never sees "no data" as fresh).
+/// Counts only, no content, so it's open like `/healthz`.
 async fn status(State(st): State<Shared>) -> Json<serde_json::Value> {
     let pages = st.page_tx.receiver_count();
     let page_seen_secs = if pages > 0 {
-        Some(0)
+        0
     } else {
         st.page_left
             .lock()
             .unwrap_or_else(|e| e.into_inner())
-            .map(|t| t.elapsed().as_secs())
+            .elapsed()
+            .as_secs()
     };
     Json(serde_json::json!({
         "pages": pages,
@@ -315,7 +318,7 @@ struct PageLeft(Shared);
 
 impl Drop for PageLeft {
     fn drop(&mut self) {
-        *self.0.page_left.lock().unwrap_or_else(|e| e.into_inner()) = Some(Instant::now());
+        *self.0.page_left.lock().unwrap_or_else(|e| e.into_inner()) = Instant::now();
     }
 }
 
@@ -530,11 +533,13 @@ mod tests {
     async fn status_counts_pages_and_adapters() {
         let (app, st) = app(None);
         let v = |s: String| serde_json::from_str::<serde_json::Value>(&s).unwrap();
+        // No page yet: counts from server start, never null.
+        *st.page_left.lock().unwrap() -= Duration::from_secs(90);
         let (code, body) = get(&app, "/status").await;
         assert_eq!(code, StatusCode::OK);
         assert_eq!(
             v(body),
-            serde_json::json!({"pages": 0, "page_seen_secs": null, "adapters": 0})
+            serde_json::json!({"pages": 0, "page_seen_secs": 90, "adapters": 0})
         );
 
         let page = events(State(st.clone())).await;
