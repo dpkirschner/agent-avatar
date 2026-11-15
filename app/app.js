@@ -207,6 +207,14 @@ if (!SR) {
 } else if (/CriOS|FxiOS|EdgiOS/.test(navigator.userAgent)) {
   warn('Only Safari may use speech recognition on iOS. Open this page in Safari.');
 }
+const RECOGNITION_ERRORS = {
+  'not-allowed': 'Microphone or speech recognition is not allowed. Check Settings › Safari.',
+  'service-not-allowed': 'Microphone or speech recognition is not allowed. Check Settings › Safari.',
+  // Brave and other Chromium builds without Google's speech service land here.
+  network: 'This browser\u2019s speech service isn\u2019t available. Use Safari (or Chrome).',
+  'audio-capture': 'No microphone found.',
+  'language-not-supported': 'Speech recognition doesn\u2019t support this language.',
+};
 function warn(msg) { const w = $('#warn'); w.textContent = msg; w.hidden = false; }
 
 function startListening() {
@@ -228,10 +236,10 @@ function startListening() {
     $('#interim').textContent = interim;
   };
   rec.onerror = (e) => {
-    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-      wantListening = false;
-      note('Microphone or speech recognition is not allowed. Check Settings › Safari.');
-    }
+    // `aborted` is us (pauseListening); `no-speech` just ends the turn.
+    if (e.error === 'aborted' || e.error === 'no-speech') return;
+    wantListening = false; // don't let continuous mode retry a failure
+    note(RECOGNITION_ERRORS[e.error] || 'Speech recognition failed (' + e.error + ').');
   };
   rec.onend = () => {
     listening = false;
