@@ -5,6 +5,27 @@ from 0 each month). Each section is drafted from commit subjects by
 git-cliff (`cliff.toml`) through `scripts/release.py`; big releases open
 with a short summary. See `docs/RELEASING.md`.
 
+## v2026.11.10 (2026-11-15)
+
+A debug log on the page, for when Talk doesn't work and it's unclear
+why.
+
+### Features
+
+- page: Settings › Debug log opens a timestamped trace on the right:
+  the event stream opening and dropping, each speech-recognition step
+  with what it thought you said (partial and final, with alternatives
+  and confidence), errors by code, the microphones the browser sees,
+  `POST /heard` and its outcome, speech out and page errors. It shows
+  the token's last 4 characters, so a wrong paste is easy to spot.
+  Copy puts the trace on the clipboard (ho-ru7.6) ([0177ec6](https://github.com/dpkirschner/agent-avatar/commit/0177ec6), [00416bd](https://github.com/dpkirschner/agent-avatar/commit/00416bd))
+
+### Fixes
+
+- build: each worktree embeds its own `app/`. Builds sharing a target
+  dir (`deploy.sh try` next to a release build) served the other
+  worktree's scripts and styles (ho-ru7.6) ([3606f05](https://github.com/dpkirschner/agent-avatar/commit/3606f05))
+
 ## v2026.11.9 (2026-11-15)
 
 The page, tuned for an unattended wall tablet after a design review at
