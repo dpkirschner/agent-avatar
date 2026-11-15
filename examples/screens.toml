@@ -1,6 +1,8 @@
 # Synthetic example screens config. Copy to ./screens.toml (gitignored)
-# and point the entries at your own pages. The agent calls
-# `show <name>` with one of these names.
+# and point the entries at your own pages. The agent shows one with a
+# `screen` card naming it, plus any params listed under it: a list
+# allows those values, "date" any YYYY-MM-DD, "int" any whole number.
+# Params reach the page as a query string.
 
 [[screen]]
 name = "status"
@@ -11,3 +13,7 @@ url = "https://status.example.com/"
 name = "weather"
 title = "Weather"
 url = "https://weather.example.com/today"
+
+[screen.params]
+range = ["today", "7d", "30d"]
+day = "date"

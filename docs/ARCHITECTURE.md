@@ -12,13 +12,14 @@ agent ──HTTP──▶ display server ──SSE──▶ kiosk page (tablet b
 ## Display server (`server/`)
 
 A Rust binary (axum, tokio). It holds the avatar's current state (the
-screen, the sprite state, what it's saying), takes commands from
+display: preset, cards and status lines; the avatar state; what it's
+saying), takes commands from
 agents over HTTP, and pushes each change to every connected page as an
 SSE event. A page that connects gets the current state first, so a
 reload or a reconnect after the tablet sleeps shows the right thing.
 
 State lives in memory only (nothing on disk), so a restart starts idle
-with no screen. The page (`app/`) is compiled into the binary with
+with no cards. The page (`app/`) is compiled into the binary with
 `include_str!`, so a release is one file.
 
 It binds loopback by default (`AVATAR_ADDR`, default `127.0.0.1:8075`).
@@ -35,26 +36,49 @@ Configuration (environment, read once at startup):
 | `AVATAR_SCREENS` | Path of the screens config. Unset: no screens. Unreadable or invalid: the server refuses to start. |
 | `AVATAR_TOKEN_FILE` | 0600 file holding the command token (preferred). |
 | `AVATAR_TOKEN` | The token itself, if a file isn't practical. |
+| `AVATAR_FACE` | Which built-in avatar the page draws (`app/avatars/<name>/`), default `blob`. Unknown: the server refuses to start. |
 | `RUST_LOG` | Log filter, default `info`. |
 
-Source: `server/src/config.rs` (screens, token), `server/src/routes.rs`
-(state, routes, SSE), `server/src/main.rs` (startup).
+Source: `server/src/config.rs` (screens, token, face),
+`server/src/display.rs` (card and status checks, presets),
+`server/src/routes.rs` (state, routes, SSE), `server/src/main.rs` (startup).
 
 ## Kiosk page (`app/`)
 
 Plain HTML, CSS and JS (no npm, no bundler; `app/index.html`,
-`app.js`, `app.css`). It renders the sprite and the current screen (an
-iframe), listens to the SSE stream, plays speech, and runs the
-browser's speech recognition for what the user says.
+`app.js`, `app.css`, one folder per avatar under `app/avatars/`). It
+draws the display, listens to the SSE stream, plays speech, and runs
+the browser's speech recognition for what the user says.
+
+- **Layout.** A status line at the top (and one at the bottom when the
+  agent sets it), the avatar column on the left, the content column on
+  the right. The preset sets the proportions (`chat` 62/38, `split`
+  half each, `focus` 24/76); with no cards the avatar has the whole
+  stage. In portrait the columns become rows.
+- **Status lines.** `STATUS_TEMPLATES` in `app.js` draws each template
+  (the server checks the slots); the page adds the agent's state, the
+  connection dot and the clock. A dropped stream shows "offline" there,
+  never a blank screen.
+- **Cards.** Built from DOM nodes with `textContent` only. Charts are
+  SVG drawn at the card's pixel size and redrawn on resize. A `screen`
+  card is an iframe, kept across redraws while its URL stays.
+- **Subtitles.** The agent's current line sits under the avatar,
+  revealed word by word (browser voice: boundary events; server audio:
+  `words` timings on the audio clock; neither: the whole line). The
+  owner's last utterance shows small above it. A `transcript` card
+  shows both sides' recent lines, kept in the page only.
 
 - **Start tap.** The page opens behind a "Tap to start" overlay; the
   tap unlocks audio, takes a screen wake lock and asks for full screen.
-- **Sprite.** An inline SVG character animated with CSS; the
-  `data-state` attribute on `#app` picks the look. What shows is
-  `talking` while the page is speaking, else `listening` while the mic
-  is on, else the server's sprite state.
-- **Screens.** A `show` event with a URL fills the main area with an
-  iframe and shrinks the sprite to a corner; `null` brings it back.
+- **Avatar module.** `app/avatars/<name>/avatar.js` sets
+  `window.AvatarFace = {mount(el), state(s), mouth(v), size(preset)}`;
+  its CSS stays under its own class. The page never looks inside it,
+  so swapping the avatar touches nothing else. What shows is `talking`
+  while the page is speaking, else `listening` while the mic is on,
+  else the server's avatar state. While talking the page drives
+  `mouth` every frame: a word boundary opens it, and with no
+  boundaries it moves on a gentle loop. To add one: a folder with both
+  files, plus its name in `config::FACES` and `routes::FACE_FILES`.
 - **Speech out.** `say` lines queue and play in order: `audio` through
   one reused `<audio>` element, else `speechSynthesis`. The mic pauses
   while the avatar talks so it doesn't hear itself. Lines that arrive
@@ -88,7 +112,7 @@ agent's replies back as `say`. It reads `GET /heard/events` (with the
 token) and calls `POST /say`. It is a separate process that uses only
 the display server's HTTP API, so another chat system needs only a new
 adapter. An agent can also call the display server directly to change
-screens or the sprite.
+the display or the avatar state.
 
 ### Matrix adapter (`adapters/matrix/`)
 
@@ -106,8 +130,9 @@ its own user (the tablet's identity) and shares a room with the agent.
   mid-stream) is spoken as the new tail; any other late edit is
   dropped. Markdown, code blocks and reply quotes are stripped and
   URLs read as "link".
-- **Sprite.** When the agent starts typing, the sprite turns
-  `thinking`; a `say` returns it to `idle`.
+- **Avatar.** When the agent starts typing, the avatar turns
+  `thinking` (`POST /display {"avatar": "thinking"}`); a `say` returns
+  it to `idle`.
 - **What it never speaks:** history from before it started (the first
   sync only finds the starting point), messages older than five
   minutes when they arrive (after an outage), anyone but the agent.
@@ -139,8 +164,12 @@ and display-server calls), `lib.rs` (the three loops).
 
 ## Screens config
 
-A TOML file listing the screens an agent may show (name, title, URL);
-see `examples/screens.toml`. Agents pick screens by name only, so a
-compromised or confused agent can't point the display at an arbitrary
-URL. The pages it lists must allow being framed by the avatar's origin
+A TOML file listing the screens an agent may show (name, title, URL,
+and optional `[screen.params]`); see `examples/screens.toml`. Agents
+pick screens by name only, so a compromised or confused agent can't
+point the display at an arbitrary URL. A param is either a list of
+allowed values or a kind (`"date"`, `"int"`); the server checks the
+agent's values and appends them as a query string, so an embeddable
+chart view can take `metric`, `range` or `highlight` without the agent
+ever writing a URL. The pages it lists must allow being framed by the avatar's origin
 (`frame-ancestors`).

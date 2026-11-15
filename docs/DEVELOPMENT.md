@@ -19,13 +19,18 @@ Drive a local server by hand:
 
 ```
 B=http://127.0.0.1:8075; J='Content-Type: application/json'
-curl -X POST -H "$J" -d '{"screen":"status"}' $B/show
-curl -X POST -H "$J" -d '{"state":"thinking"}' $B/sprite
+curl -X POST -H "$J" -d '{"preset":"split","content":[{"type":"text","body":"Hi."}]}' $B/display
+curl -X POST -H "$J" -d '{"avatar":"thinking"}' $B/display
 curl -X POST -H "$J" -d '{"text":"Hello."}' $B/say
 curl -N $B/heard/events     # what the page hears
 ```
 
 Add `-H "Authorization: Bearer $TOKEN"` when the server has a token.
+
+`examples/demo.sh <scene>` walks the presets and card types with
+synthetic data (`chat`, `split`, `focus`, `alert`, `screen`,
+`calendar`, `transcript`, `clear`; `B` and `TOKEN` from the
+environment).
 
 Run the Matrix adapter against a local server with its environment
 (see ARCHITECTURE § Matrix adapter): `MATRIX_HOMESERVER`,

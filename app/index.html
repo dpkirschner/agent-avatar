@@ -10,44 +10,36 @@
 <meta name="theme-color" content="#14161b">
 <title>Avatar</title>
 <link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="avatars/{{face}}/avatar.css">
+<script src="avatars/{{face}}/avatar.js" defer></script>
 <script src="app.js" defer></script>
 </head>
 <body>
-<template id="sprite-tpl">
-  <svg class="sprite" viewBox="0 0 240 240" aria-hidden="true">
-    <circle class="ring" cx="120" cy="120" r="92"/>
-    <g class="bob">
-      <circle class="body" cx="120" cy="120" r="88"/>
-      <g class="eyes">
-        <ellipse class="eye" cx="88" cy="105" rx="18" ry="22"/>
-        <circle class="pupil" cx="90" cy="108" r="8"/>
-        <ellipse class="eye" cx="152" cy="105" rx="18" ry="22"/>
-        <circle class="pupil" cx="154" cy="108" r="8"/>
-      </g>
-      <ellipse class="mouth" cx="120" cy="160" rx="22" ry="14"/>
-      <g class="dots">
-        <circle cx="170" cy="48" r="7"/>
-        <circle cx="190" cy="34" r="8"/>
-        <circle cx="212" cy="22" r="9"/>
-      </g>
-    </g>
-  </svg>
-</template>
+<div id="app" data-state="idle" data-preset="chat" class="empty">
+  <header id="top" class="status">
+    <div class="items"></div>
+    <div class="own">
+      <span id="agent-state"></span>
+      <span id="link" title="Connection to the display server"></span>
+      <time id="clock"></time>
+    </div>
+  </header>
 
-<div id="app" data-state="idle">
   <main id="stage">
-    <iframe id="screen" title="Screen" hidden></iframe>
-    <div id="avatar"></div>
+    <section id="side">
+      <div id="avatar"></div>
+      <div id="subs" aria-live="polite">
+        <p id="heard"></p>
+        <p id="said"></p>
+        <p id="interim"></p>
+      </div>
+      <button id="mic" type="button">Talk</button>
+    </section>
+    <section id="content" aria-label="Content"></section>
   </main>
 
-  <footer id="bar">
-    <button id="mic" type="button">Talk</button>
-    <div id="caption" aria-live="polite">
-      <div id="interim"></div>
-      <div id="heard"></div>
-      <div id="said"></div>
-    </div>
-    <span id="link" title="Connection to the display server"></span>
+  <footer id="bottom" class="status" hidden>
+    <div class="items"></div>
   </footer>
 
   <div id="corner" aria-hidden="true"></div>

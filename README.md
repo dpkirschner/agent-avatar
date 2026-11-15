@@ -3,10 +3,12 @@
 A face and a voice for an AI agent, on a spare tablet.
 
 agent-avatar turns a full-screen browser page (an iPad in Safari, say)
-into a display your agent can drive: an animated sprite that shows
-whether it's idle, listening, thinking or talking; screens it can swap
-in (a status page, a dashboard, anything you list in a config file);
-and speech in and out. You talk to the page; your words go to the
+into a display your agent can drive: an animated face that shows
+whether it's idle, listening, thinking or talking, with subtitles as it
+speaks; cards it fills with what it's talking about (figures, charts,
+a calendar, alerts, lists) or pages you list in a config file; and
+speech in and out. The agent picks how the face and the content share
+the screen. You talk to the page; your words go to the
 agent; the agent's replies come back spoken, and it can change what's
 on screen while it works.
 
@@ -16,7 +18,7 @@ work; local speech is next. See [docs/API.md](docs/API.md).
 ## How it fits together
 
 ```
-agent ──HTTP (show / sprite / say)──▶ display server ──SSE──▶ kiosk page
+agent ──HTTP (display / say)──▶ display server ──SSE──▶ kiosk page
   ▲                                                             │
   └────────── adapter (e.g. Matrix) ◀── speech-to-text ─────────┘
 ```

@@ -417,8 +417,8 @@ print(", ".join(s["name"] for s in json.load(open(sys.argv[1]))) or "none")' "$T
   # A command without the token must be refused when a token is set. No
   # body is sent, so nothing on the display changes either way.
   if [ -n "$TOKEN_FILE" ]; then
-    code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "http://$LISTEN/sprite")
-    echo "POST /sprite without a token -> $code"
+    code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "http://$LISTEN/display")
+    echo "POST /display without a token -> $code"
     [ "$code" = 401 ] || die "commands answer $code without the token; expected 401"
   else
     echo "note: no AVATAR_TOKEN_FILE; commands are open to anything that reaches the port"
