@@ -10,7 +10,7 @@
 #   scripts/deploy.sh rollback [<tag>]
 #   scripts/deploy.sh env [--matrix] list
 #   scripts/deploy.sh env [--matrix] set|unset|restore [--yes] [--restart] ARGS
-#   scripts/deploy.sh verify [--log RE]... [--check SCRIPT]
+#   scripts/deploy.sh verify [--log RE]... [--matrix-log RE]... [--check SCRIPT]
 #   scripts/deploy.sh status
 #
 # A trimmed copy of vitals' deploy.sh: the same releases layout, env
@@ -63,7 +63,10 @@
 # verify   No sudo. Reports only what it observed: the live tag against
 #          /version, the install checks (plus --check), and each --log
 #          pattern in the log lines written since the live release
-#          started. Exits 1 if anything is missing.
+#          started. With the adapter set up, also its state (loaded,
+#          pid, started from the live release) and each --matrix-log
+#          pattern in the adapter's log since it last started. Exits 1
+#          if anything is missing.
 # status   What's live, what's installed, and the install history.
 #
 # Settings come from the launchd plist (data dir, address, token file,
@@ -356,9 +359,7 @@ stop_server() {
   svc_stop "$LABEL" "$PROG" server
 }
 
-log_lines() { # lines in the server log so far
-  [ -n "$LOG" ] && [ -f "$LOG" ] && wc -l <"$LOG" | tr -d ' ' || echo 0
-}
+log_lines() { file_lines "$LOG"; } # lines in the server log so far
 
 start_server() {
   STOPPED=1
@@ -382,8 +383,11 @@ start_adapter() {
     echo "warning: $(live_tag) has no $MATRIX_BIN; the adapter stays stopped" >&2
     return 0
   fi
-  local log
+  local log n=0
   log=$(pb StandardOutPath "$MATRIX_PLIST")
+  [ -z "$log" ] || [ ! -f "$log" ] || n=$(wc -l <"$log" | tr -d ' ')
+  # What verify reads the adapter log from; in the release it runs.
+  printf 'started %s\nlog_line %s\n' "$(date '+%F %T %z')" "$n" >"$CUR/ADAPTER_STARTED"
   svc_start "$MATRIX_PLIST" "$log" "$MATRIX_UP" ||
     echo "warning: no '$MATRIX_UP' in $log within 60s; check that log" >&2
 }
@@ -744,38 +748,89 @@ cmd_rollback() {
 }
 
 # ── verify ─────────────────────────────────────────────────────────────
-log_since() { # line: the log from that line on, without colour codes
-  tail -n +"$1" "$LOG" | sed $'s/\x1b\\[[0-9;]*m//g'
+log_since() { # file line: the file from that line on, without colour codes
+  tail -n +"$2" "$1" | sed $'s/\x1b\\[[0-9;]*m//g'
 }
 
-cmd_verify() { # extra log-re...
-  local extra=$1
-  shift
-  load_plist
-  local tag from=1 fail=0 re hit
-  tag=$(live_tag)
-  [ -n "$tag" ] || die "nothing is installed in releases/current yet"
-  [ -z "$extra" ] || [ -r "$extra" ] || die "can't read $extra"
-  step "live: $tag"
-  if [ -f "$CUR/INSTALLED" ]; then
-    sed 's/^/   /' "$CUR/INSTALLED"
-    from=$(($(awk '$1 == "log_line" {print $2}' "$CUR/INSTALLED") + 1))
-    [ "$from" -le "$(($(log_lines) + 1))" ] || from=1 # the log was rotated
-  fi
-  run_checks "$tag" "$extra"
-  if [ $# -gt 0 ]; then
-    [ -n "$LOG" ] && [ -r "$LOG" ] || die "can't read the server log ($LOG)"
-    step "log since $tag started (line $from)"
-  fi
+file_lines() { # file: its line count, 0 if missing or unset
+  [ -n "$1" ] && [ -f "$1" ] && wc -l <"$1" | tr -d ' ' || echo 0
+}
+
+since_line() { # marker-file log: the first line written after the marker
+  local from=1
+  [ -f "$1" ] || { echo 1; return; }
+  from=$(($(awk '$1 == "log_line" {print $2}' "$1") + 1))
+  [ "$from" -le "$(($(file_lines "$2") + 1))" ] || from=1 # the log was rotated
+  echo "$from"
+}
+
+find_res() { # log from re...: report each pattern; 1 if any is missing
+  local log=$1 from=$2 re hit miss=0
+  shift 2
   for re in "$@"; do
-    hit=$(log_since "$from" | grep -E -- "$re" | tail -1 || true)
+    hit=$(log_since "$log" "$from" | grep -E -- "$re" | tail -1 || true)
     if [ -n "$hit" ]; then
       echo "found /$re/: $hit"
     else
       echo "NOT FOUND /$re/"
-      fail=1
+      miss=1
     fi
   done
+  return "$miss"
+}
+
+verify_adapter() { # tag matrix-re...: state, then its log; 1 if a pattern is missing
+  local tag=$1 label prog mlog pid from
+  shift
+  label=$(pb Label "$MATRIX_PLIST")
+  prog=$(pb ProgramArguments:0 "$MATRIX_PLIST")
+  mlog=$(pb StandardOutPath "$MATRIX_PLIST")
+  step "adapter ($label)"
+  # No sudo for print, as in status.
+  if "$LAUNCHCTL" print "system/$label" >/dev/null 2>&1; then
+    echo "   loaded"
+  else
+    echo "   not loaded"
+  fi
+  pid=$(pgrep -f "$prog" | head -1 || true)
+  echo "   pid: ${pid:-none running $prog}"
+  if [ -f "$CUR/ADAPTER_STARTED" ]; then
+    echo "   started from $tag:"
+    sed 's/^/      /' "$CUR/ADAPTER_STARTED"
+  else
+    echo "   not started from $tag (no ADAPTER_STARTED in the release)"
+  fi
+  [ $# -gt 0 ] || return 0
+  [ -n "$mlog" ] && [ -r "$mlog" ] || die "can't read the adapter log ($mlog)"
+  from=$(since_line "$CUR/ADAPTER_STARTED" "$mlog")
+  step "adapter log since it started (line $from of $mlog)"
+  find_res "$mlog" "$from" "$@"
+}
+
+cmd_verify() { # extra n-log-res log-re... matrix-re...
+  local extra=$1 nlog=$2
+  shift 2
+  load_plist
+  local tag from=1 fail=0
+  local res=("${@:1:$nlog}") mres=("${@:$((nlog + 1))}")
+  tag=$(live_tag)
+  [ -n "$tag" ] || die "nothing is installed in releases/current yet"
+  [ -z "$extra" ] || [ -r "$extra" ] || die "can't read $extra"
+  [ ${#mres[@]} -eq 0 ] || has_adapter || die "--matrix-log: no adapter plist $MATRIX_PLIST"
+  step "live: $tag"
+  if [ -f "$CUR/INSTALLED" ]; then
+    sed 's/^/   /' "$CUR/INSTALLED"
+    from=$(since_line "$CUR/INSTALLED" "$LOG")
+  fi
+  run_checks "$tag" "$extra"
+  if [ "$nlog" -gt 0 ]; then
+    [ -n "$LOG" ] && [ -r "$LOG" ] || die "can't read the server log ($LOG)"
+    step "log since $tag started (line $from)"
+    find_res "$LOG" "$from" "${res[@]}" || fail=1
+  fi
+  if has_adapter; then
+    verify_adapter "$tag" ${mres[@]+"${mres[@]}"} || fail=1
+  fi
   if [ "$fail" = 1 ]; then
     echo "verify: not everything expected was observed (see NOT FOUND above)" >&2
     exit 1
@@ -878,16 +933,17 @@ env)
   ;;
 verify)
   shift
-  check= res=()
+  check= res=() mres=()
   while [ $# -gt 0 ]; do
     case $1 in
     --log) [ $# -ge 2 ] || usage; res+=("$2"); shift ;;
+    --matrix-log) [ $# -ge 2 ] || usage; mres+=("$2"); shift ;;
     --check) [ $# -ge 2 ] || usage; check=$2; shift ;;
     *) usage ;;
     esac
     shift
   done
-  cmd_verify "$check" ${res[@]+"${res[@]}"}
+  cmd_verify "$check" "${#res[@]}" ${res[@]+"${res[@]}"} ${mres[@]+"${mres[@]}"}
   ;;
 status) cmd_status ;;
 *) usage ;;

@@ -1,4 +1,4 @@
-"""Tests for deploy.sh's setup, env and try --clean. Synthetic plists only.
+"""Tests for deploy.sh's setup, env, verify and try --clean. Synthetic plists only.
 
 They run deploy.sh against a throwaway plist in a temp dir with SUDO=''
 and LAUNCHCTL=true, so nothing live is read or changed. macOS only
@@ -270,6 +270,137 @@ class DeploySetupMatrix(unittest.TestCase):
         self.assertIn("_FILE", r.stderr)
         r = self.run_deploy("status")
         self.assertIn("adapter: not loaded", r.stdout)
+
+
+FAKE_CURL = """#!/bin/bash
+# Stands in for the live server: 200 for each GET, 401 for a POST.
+out= post=0 url=
+while [ $# -gt 0 ]; do
+  case $1 in
+  -o) out=$2; shift ;;
+  -w) shift ;;
+  -X) post=1; shift ;;
+  -s) ;;
+  *) url=$1 ;;
+  esac
+  shift
+done
+case $url in
+*/version) body='{"version":"%s"}' ;;
+*/screens) body='[]' ;;
+*) body='{}' ;;
+esac
+[ "$out" = /dev/null ] || [ -z "$out" ] || printf '%%s' "$body" >"$out"
+if [ "$post" = 1 ]; then printf 401; else printf 200; fi
+"""
+
+
+@unittest.skipUnless(sys.platform == "darwin" and os.path.exists("/usr/libexec/PlistBuddy"),
+                     "needs macOS PlistBuddy")
+class DeployVerify(unittest.TestCase):
+    """verify against a synthetic installed release and a fake curl."""
+
+    TAG = "v2026.01.1"
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.data = os.path.join(self.tmp, "data dir")
+        self.plist = os.path.join(self.tmp, "com.agent-avatar.test.plist")
+        self.mplist = os.path.join(self.tmp, "com.agent-avatar.test-matrix.plist")
+        self.log = os.path.join(self.tmp, "server.log")
+        self.mlog = os.path.join(self.tmp, "matrix.log")
+        cur = os.path.join(self.data, "releases", "current")
+        self.rel = os.path.join(self.data, "releases", self.TAG)
+        os.makedirs(self.rel)
+        os.symlink(self.TAG, cur)
+        self.write_plist(self.plist, "com.agent-avatar.test",
+                         os.path.join(cur, "agent-avatar-server"), self.log,
+                         {"AVATAR_DATA_DIR": self.data, "AVATAR_ADDR": "127.0.0.1:1"})
+        self.bin = os.path.join(self.tmp, "bin")
+        os.makedirs(self.bin)
+        curl = os.path.join(self.bin, "curl")
+        with open(curl, "w") as f:
+            f.write(FAKE_CURL % self.TAG)
+        os.chmod(curl, 0o755)
+        # The server log: one line from before this release started.
+        self.write(self.log, "old: server up\nserver up\n")
+        self.write(os.path.join(self.rel, "INSTALLED"), "started 2026-01-01\nlog_line 1\n")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp)
+
+    @staticmethod
+    def write(path, text):
+        with open(path, "w") as f:
+            f.write(text)
+
+    @staticmethod
+    def write_plist(path, label, prog, log, env):
+        with open(path, "wb") as f:
+            plistlib.dump({"Label": label, "ProgramArguments": [prog],
+                           "StandardOutPath": log, "EnvironmentVariables": env}, f)
+
+    def add_adapter(self, started_line=None):
+        self.write_plist(self.mplist, "com.agent-avatar.test-matrix",
+                         os.path.join(self.tmp, "no-such-dir", "agent-avatar-matrix"),
+                         self.mlog, {})
+        self.write(self.mlog, "adapter up (old run)\nadapter up\nsynced room\n")
+        if started_line is not None:
+            self.write(os.path.join(self.rel, "ADAPTER_STARTED"),
+                       f"started 2026-01-02\nlog_line {started_line}\n")
+
+    def verify(self, *args):
+        env = dict(os.environ, SUDO="", LAUNCHCTL="false", AVATAR_PLIST=self.plist,
+                   AVATAR_MATRIX_PLIST=self.mplist,
+                   PATH=self.bin + os.pathsep + os.environ["PATH"])
+        return subprocess.run(["bash", DEPLOY, "verify", *args], env=env,
+                              stdin=subprocess.DEVNULL, capture_output=True, text=True)
+
+    def test_server_log_only_since_the_release_started(self):
+        r = self.verify("--log", "^server up")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("found /^server up/", r.stdout)
+        r = self.verify("--log", "old:")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("NOT FOUND /old:/", r.stdout)
+        self.assertNotIn("adapter", r.stdout)  # not set up, so not shown
+
+    def test_matrix_log_reads_the_adapter_log_since_it_started(self):
+        self.add_adapter(started_line=1)
+        r = self.verify("--log", "server up", "--matrix-log", "^adapter up$",
+                        "--matrix-log", "synced")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("found /^adapter up$/: adapter up", r.stdout)
+        self.assertIn("found /synced/", r.stdout)
+        self.assertIn("line 2 of", r.stdout)
+        self.assertIn("not loaded", r.stdout)
+        self.assertIn(f"started from {self.TAG}:", r.stdout)
+        # The adapter's log isn't the server's.
+        r = self.verify("--log", "adapter up")
+        self.assertEqual(r.returncode, 1)
+        r = self.verify("--matrix-log", "old run")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("NOT FOUND /old run/", r.stdout)
+
+    def test_adapter_not_started_from_this_release(self):
+        self.add_adapter()
+        r = self.verify()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn(f"not started from {self.TAG}", r.stdout)
+        # Without a marker the whole log counts, as with a rotated log.
+        r = self.verify("--matrix-log", "old run")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("line 1 of", r.stdout)
+
+    def test_rotated_adapter_log_reads_from_the_top(self):
+        self.add_adapter(started_line=50)
+        r = self.verify("--matrix-log", "old run")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def test_matrix_log_needs_the_adapter(self):
+        r = self.verify("--matrix-log", "adapter up")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("no adapter plist", r.stderr)
 
 
 if __name__ == "__main__":
