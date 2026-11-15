@@ -124,7 +124,7 @@ button.primary { border-color: var(--acc); color: var(--acc); }
 }
 .panel h2 { margin: 0; font-size: 15px; color: var(--dim); text-transform: uppercase; letter-spacing: .06em; }
 .panel label { display: flex; gap: 10px; align-items: center; }
-.panel select { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px; flex: 1; min-width: 0; }
+.panel select, .panel input[type=password] { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px; flex: 1; min-width: 0; }
 .panel input[type=range] { flex: 1; }
 .panel .row { display: flex; gap: 10px; flex-wrap: wrap; }
 .panel .primary { align-self: flex-end; }
