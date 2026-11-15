@@ -27,7 +27,9 @@ and `/Library/LaunchDaemons/com.agent-avatar.server.plist` (root:wheel
 644), which runs `releases/current/agent-avatar-server` as you, with
 `AVATAR_ADDR`, `AVATAR_SCREENS` and `AVATAR_TOKEN_FILE` set, logging to
 `~/Library/Logs/agent-avatar.log`. Nothing starts until the first
-install.
+install. Each release holds both binaries, the server and the Matrix
+adapter; the adapter only runs once `setup-matrix` installs its plist
+(section 5).
 
 ## 2. Release, build, install
 
@@ -51,7 +53,7 @@ nothing live changes.
 
 ## 3. Settings
 
-`scripts/deploy.sh env list|set|unset|restore` edits the plist's
+`scripts/deploy.sh env [--matrix] list|set|unset|restore` edits the plist's
 environment with a diff, a confirmation and a backup. Secret-looking
 keys are refused (the plist is world-readable): use the `_FILE` form.
 A change takes effect at the next start (`env set ... --restart`).
@@ -80,6 +82,33 @@ From the same machine: `http://127.0.0.1:8075`. From a container on it
 `Authorization: Bearer <token>`; read it from the token file into the
 agent's own secret store rather than copying it into a config that
 gets committed.
+
+### Matrix adapter (optional)
+
+Give the adapter its own Matrix user, joined to an unencrypted room
+with the agent. Put that user's access token in the data dir, 0600,
+without it touching argv or shell history (paste, then Ctrl-D):
+
+```
+D="$HOME/Library/Application Support/agent-avatar"
+(umask 077 && cat >"$D/matrix-token")
+```
+
+Then, in a terminal (sudo):
+
+```
+scripts/deploy.sh setup-matrix --homeserver http://127.0.0.1:8008 --user @tablet:example.org --room '!id:example.org' --agent @agent:example.org
+```
+
+This writes `/Library/LaunchDaemons/com.agent-avatar.matrix.plist`,
+which runs `releases/current/agent-avatar-matrix` with the display
+server's address and token file, logging to
+`~/Library/Logs/agent-avatar-matrix.log`. If the live release has the
+adapter, it starts now ("adapter up" in the log); otherwise with the
+next install. From then on `install`, `rollback` and
+`env --restart` stop and start it with the server, and
+`scripts/deploy.sh env --matrix ...` edits its settings. Quote the room
+id: `!` means something to the shell.
 
 ## 6. Screens that allow framing
 

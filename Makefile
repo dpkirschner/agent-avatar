@@ -2,7 +2,7 @@
 # Prereqs: Rust toolchain (see docs/DEVELOPMENT.md).
 
 .DEFAULT_GOAL := help
-.PHONY: help server serve run test check leakscan release-draft release fmt lint clean
+.PHONY: help server serve run matrix test check leakscan release-draft release fmt lint clean
 
 help: ## List available targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | sed 's/:.*## /\t/' \
@@ -15,6 +15,9 @@ serve: ## Run the server on 127.0.0.1:8075 (AVATAR_ADDR overrides)
 	cargo run -p agent-avatar-server
 
 run: serve ## Alias for serve (the page has no build step)
+
+matrix: ## Run the Matrix adapter (MATRIX_* env; docs/ARCHITECTURE.md)
+	cargo run -p agent-avatar-matrix
 
 test: ## Run the test suites
 	cargo test --workspace

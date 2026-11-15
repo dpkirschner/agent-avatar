@@ -184,5 +184,93 @@ class DeploySetup(unittest.TestCase):
         self.assertFalse(os.path.exists(self.plist))
 
 
+@unittest.skipUnless(sys.platform == "darwin" and os.path.exists("/usr/libexec/PlistBuddy"),
+                     "needs macOS PlistBuddy")
+class DeploySetupMatrix(unittest.TestCase):
+    """setup-matrix and env --matrix, after a plain setup. Synthetic ids."""
+
+    ARGS = ("--homeserver", "http://127.0.0.1:8008", "--user", "@tablet:example.org",
+            "--room", "!room:example.org", "--agent", "@agent:example.org")
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.data = os.path.join(self.tmp, "data dir")
+        self.plist = os.path.join(self.tmp, "com.agent-avatar.test.plist")
+        self.mplist = os.path.join(self.tmp, "com.agent-avatar.test-matrix.plist")
+        r = self.run_deploy("setup", "--addr", "127.0.0.1:9999")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.tokf = os.path.join(self.data, "matrix-token")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp)
+
+    def run_deploy(self, *args):
+        env = dict(os.environ, SUDO="", LAUNCHCTL="false", AVATAR_PLIST=self.plist,
+                   AVATAR_MATRIX_PLIST=self.mplist, AVATAR_DATA_DIR=self.data,
+                   AVATAR_BUILD_DIR=os.path.join(self.tmp, "b"))
+        return subprocess.run(["bash", DEPLOY, *args], env=env,
+                              stdin=subprocess.DEVNULL, capture_output=True, text=True)
+
+    def write_token(self, mode=0o600):
+        with open(self.tokf, "w") as f:
+            f.write("synthetic-matrix-token")
+        os.chmod(self.tokf, mode)
+
+    def test_writes_the_adapter_plist(self):
+        self.write_token()
+        r = self.run_deploy("setup-matrix", *self.ARGS)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        with open(self.mplist, "rb") as f:
+            p = plistlib.load(f)
+        self.assertEqual(p["Label"], "com.agent-avatar.matrix")
+        self.assertEqual(p["ProgramArguments"],
+                         [os.path.join(self.data, "releases/current/agent-avatar-matrix")])
+        env = p["EnvironmentVariables"]
+        self.assertEqual(env["AVATAR_URL"], "http://127.0.0.1:9999")
+        self.assertEqual(env["AVATAR_TOKEN_FILE"], os.path.join(self.data, "token"))
+        self.assertEqual(env["MATRIX_TOKEN_FILE"], self.tokf)
+        self.assertEqual(env["MATRIX_ROOM"], "!room:example.org")
+        self.assertEqual(env["MATRIX_AGENT_USER"], "@agent:example.org")
+        self.assertNotIn("synthetic-matrix-token", read(self.mplist).decode())
+        # No release is installed, so nothing was started.
+        self.assertIn("starts with the next install", r.stdout)
+        r = self.run_deploy("setup-matrix", *self.ARGS)
+        self.assertIn("exists", r.stderr)
+
+    def test_needs_a_0600_token_file(self):
+        r = self.run_deploy("setup-matrix", *self.ARGS)
+        self.assertIn("matrix-token", r.stderr)
+        self.write_token(0o644)
+        r = self.run_deploy("setup-matrix", *self.ARGS)
+        self.assertIn("0600", r.stderr)
+        self.assertFalse(os.path.exists(self.mplist))
+
+    def test_rejects_malformed_ids(self):
+        self.write_token()
+        for i, bad in [(5, "#alias:example.org"), (3, "tablet"), (7, "!room:example.org"),
+                       (1, "127.0.0.1:8008")]:
+            args = list(self.ARGS)
+            args[i] = bad
+            r = self.run_deploy("setup-matrix", *args)
+            self.assertNotEqual(r.returncode, 0, bad)
+        self.assertFalse(os.path.exists(self.mplist))
+
+    def test_env_matrix_edits_the_adapter_plist(self):
+        r = self.run_deploy("env", "--matrix", "list")
+        self.assertIn("setup-matrix", r.stderr)
+        self.write_token()
+        self.assertEqual(self.run_deploy("setup-matrix", *self.ARGS).returncode, 0)
+        r = self.run_deploy("env", "--matrix", "set", "--yes", "MATRIX_SETTLE_MS=2500")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        with open(self.mplist, "rb") as f:
+            self.assertEqual(plistlib.load(f)["EnvironmentVariables"]["MATRIX_SETTLE_MS"], "2500")
+        with open(self.plist, "rb") as f:
+            self.assertNotIn("MATRIX_SETTLE_MS", plistlib.load(f)["EnvironmentVariables"])
+        r = self.run_deploy("env", "--matrix", "set", "--yes", "MATRIX_TOKEN=x")
+        self.assertIn("_FILE", r.stderr)
+        r = self.run_deploy("status")
+        self.assertIn("adapter: not loaded", r.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()

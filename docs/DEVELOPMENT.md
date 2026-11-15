@@ -27,8 +27,15 @@ curl -N $B/heard/events     # what the page hears
 
 Add `-H "Authorization: Bearer $TOKEN"` when the server has a token.
 
+Run the Matrix adapter against a local server with its environment
+(see ARCHITECTURE § Matrix adapter): `MATRIX_HOMESERVER`,
+`MATRIX_USER`, `MATRIX_ROOM`, `MATRIX_AGENT_USER`, `MATRIX_TOKEN_FILE`,
+then `make matrix`.
+
 Tests: Rust unit and route tests live next to the code
-(`tower::ServiceExt::oneshot` for routes). The release, deploy and leak-scan
+(`tower::ServiceExt::oneshot` for routes). The adapter's
+`adapters/matrix/tests/end_to_end.rs` runs it against a fake
+homeserver and a fake display server. The release, deploy and leak-scan
 scripts have their own tests in `scripts/test_*.py`, run by
 `make leakscan` (the deploy tests use throwaway plists and need macOS).
 

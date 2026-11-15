@@ -8,7 +8,8 @@ outflow and vitals repos: same gate, release flow and leak scan.
 
 - Gate: `make check` (fmt, clippy -D warnings, tests, `make leakscan`).
   Run it before committing.
-- Layout: `server/` (Rust, axum), `app/` (plain HTML/JS, no build
+- Layout: `server/` (Rust, axum), `adapters/matrix/` (Rust, the
+  Matrix adapter binary; HTTP client of the server only), `app/` (plain HTML/JS, no build
   step, compiled into the server binary; the page CSP forbids inline
   scripts and styles), `examples/` (synthetic only), `scripts/`
   (release and leak scan), `docs/`.

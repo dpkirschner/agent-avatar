@@ -25,6 +25,10 @@ have here.
   drive the display. The page itself never holds it.
 - **Adapter**: the piece that carries what the user says on the page
   to an agent's chat, and the agent's replies back to the avatar
-  (Matrix first).
+  (Matrix first). A separate process using only the display server's
+  HTTP API.
+- **Settle**: a reply is settled once it has gone `MATRIX_SETTLE_MS`
+  without an edit; only then is it spoken, so a streamed reply is said
+  once.
 - **Event**: one message from the display server to the page over SSE
   (`show`, `sprite`, `say`), or to an adapter (`heard`).

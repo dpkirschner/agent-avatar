@@ -1,6 +1,7 @@
 # Architecture
 
-Three parts, each replaceable.
+Three parts, each replaceable: the display server, the kiosk page,
+and adapters.
 
 ```
 agent ──HTTP──▶ display server ──SSE──▶ kiosk page (tablet browser)
@@ -84,9 +85,57 @@ Browser notes from the prototype:
 
 An adapter carries what the user said on the page to an agent and the
 agent's replies back as `say`. It reads `GET /heard/events` (with the
-token) and calls `POST /say`. The first one talks to Matrix: speech
-goes into the agent's chat, replies become speech. An agent can also
-call the display server directly to change screens or the sprite.
+token) and calls `POST /say`. It is a separate process that uses only
+the display server's HTTP API, so another chat system needs only a new
+adapter. An agent can also call the display server directly to change
+screens or the sprite.
+
+### Matrix adapter (`adapters/matrix/`)
+
+A second binary, `agent-avatar-matrix`. It logs in to a homeserver as
+its own user (the tablet's identity) and shares a room with the agent.
+
+- **Speech in.** Each `heard` utterance is sent to the room as an
+  `m.text` message.
+- **Replies out.** It long-polls `/sync`, filtered to the room, and
+  speaks the agent's `m.text` and `m.notice` messages. Agents that
+  stream a reply post a message, then edit it (`m.replace`); the
+  adapter keeps the newest `m.new_content` and speaks once the reply
+  has gone `MATRIX_SETTLE_MS` without an edit. An edit that arrives
+  after the reply was spoken and only adds to it (the agent paused
+  mid-stream) is spoken as the new tail; any other late edit is
+  dropped. Markdown, code blocks and reply quotes are stripped and
+  URLs read as "link".
+- **Sprite.** When the agent starts typing, the sprite turns
+  `thinking`; a `say` returns it to `idle`.
+- **What it never speaks:** history from before it started (the first
+  sync only finds the starting point), messages older than five
+  minutes when they arrive (after an outage), anyone but the agent.
+- **Failures.** A dropped connection on either side is retried with
+  backoff. If the homeserver can't take an utterance, the tablet says
+  "I couldn't reach the agent." A rejected token (401/403), a room it
+  isn't in, or an end-to-end encrypted room stops it with a log line:
+  it speaks the plain client-server API and can't read encrypted
+  rooms.
+
+Configuration (environment, read once at startup):
+
+| Variable | Meaning |
+|---|---|
+| `AVATAR_URL` | The display server, default `http://127.0.0.1:8075`. |
+| `AVATAR_TOKEN_FILE` | The display server's command token file, if it has one. |
+| `MATRIX_HOMESERVER` | Homeserver base URL (client-server API). |
+| `MATRIX_USER` | The adapter's user, `@name:server`. |
+| `MATRIX_TOKEN_FILE` | 0600 file holding that user's access token (required; no plain-env form). |
+| `MATRIX_ROOM` | Room id, `!id:server` (not an alias). |
+| `MATRIX_AGENT_USER` | The agent's user: only its messages are spoken. |
+| `MATRIX_SETTLE_MS` | Quiet time before a reply is spoken, default `1500`. |
+| `RUST_LOG` | Log filter, default `info`. |
+
+Source: `config.rs` (environment), `sync.rs` (the `/sync` response to
+messages, edits and typing), `replies.rs` (settling edits), `speech.rs`
+(text for speech), `sse.rs` (the heard stream), `http.rs` (homeserver
+and display-server calls), `lib.rs` (the three loops).
 
 ## Screens config
 

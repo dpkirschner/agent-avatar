@@ -10,8 +10,8 @@ and speech in and out. You talk to the page; your words go to the
 agent; the agent's replies come back spoken, and it can change what's
 on screen while it works.
 
-**Status: early.** The page and the display server work; the Matrix
-adapter and local speech are next. See [docs/API.md](docs/API.md).
+**Status: early.** The page, the display server and the Matrix adapter
+work; local speech is next. See [docs/API.md](docs/API.md).
 
 ## How it fits together
 
@@ -25,8 +25,9 @@ agent ──HTTP (show / sprite / say)──▶ display server ──SSE──�
 - **Display server** (`server/`): a small Rust (axum) service. Agents
   call it over HTTP; it pushes events to the page over Server-Sent
   Events.
-- **Adapters** connect the page's speech to an agent's chat (Matrix
-  first).
+- **Adapters** (`adapters/`) connect the page's speech to an agent's
+  chat. The Matrix adapter posts what you say to a room and speaks the
+  agent's replies.
 - **Screens** come from a config file you keep outside the repo; see
   [examples/screens.toml](examples/screens.toml).
 

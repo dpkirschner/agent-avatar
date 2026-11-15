@@ -2,13 +2,14 @@
 # deploy.sh: build and install agent-avatar releases on a macOS launchd host.
 #
 #   scripts/deploy.sh setup [--addr HOST:PORT]
+#   scripts/deploy.sh setup-matrix --homeserver URL --user @U:S --room !R:S --agent @A:S
 #   scripts/deploy.sh try <ref> [--port P] [--check SCRIPT]
 #   scripts/deploy.sh try --clean
 #   scripts/deploy.sh build <tag> [--rebuild]
 #   scripts/deploy.sh install <tag> [--check SCRIPT]
 #   scripts/deploy.sh rollback [<tag>]
-#   scripts/deploy.sh env list
-#   scripts/deploy.sh env set|unset|restore [--yes] [--restart] ARGS
+#   scripts/deploy.sh env [--matrix] list
+#   scripts/deploy.sh env [--matrix] set|unset|restore [--yes] [--restart] ARGS
 #   scripts/deploy.sh verify [--log RE]... [--check SCRIPT]
 #   scripts/deploy.sh status
 #
@@ -16,8 +17,8 @@
 # editing and checks, minus everything about a database (the display
 # server keeps no data). Every deploy is a release (docs/RELEASING.md).
 # Each release lives in <data dir>/releases/<tag>/ (agent-avatar-server,
-# BUILD; the page is compiled into the binary) and launchd runs
-# releases/current, a symlink. Installing or rolling back switches that
+# agent-avatar-matrix, BUILD; the page is compiled into the server) and
+# launchd runs releases/current, a symlink. Installing or rolling back switches that
 # link, so the development checkout is never what's live.
 #
 # setup    Once per host, in a terminal (sudo). Creates the data dir
@@ -26,6 +27,14 @@
 #          there is none, and the LaunchDaemon plist (root:wheel 644)
 #          pointing at releases/current. Starts nothing: the first
 #          install does.
+# setup-matrix  Once per host, after setup, in a terminal (sudo). The
+#          Matrix adapter's LaunchDaemon (com.agent-avatar.matrix): it
+#          talks to this host's display server with its token, and to the
+#          homeserver as --user, in --room, speaking --agent's replies.
+#          Put the user's access token in <data dir>/matrix-token (0600)
+#          first; setup-matrix refuses without it. Starts the adapter if
+#          the live release has it; from then on install, rollback and
+#          env --restart stop and start it with the server.
 # try      No sudo; nothing live changes. Builds <ref> (a branch or
 #          commit), starts it on 127.0.0.1:8077 (--port) with the live
 #          screens config and a scratch token, runs the install checks,
@@ -41,7 +50,8 @@
 #          the fetched JSON. Prunes to the newest $KEEP_RELEASES.
 # rollback Points current back at <tag>, default the release before the
 #          live one.
-# env      The plist's EnvironmentVariables. list prints them. set
+# env      The plist's EnvironmentVariables (--matrix: the adapter's
+#          plist). list prints them. set
 #          KEY=VALUE..., unset KEY... and restore [FILE] (default: the
 #          newest backup) edit a temp copy, lint it, show the diff, ask,
 #          back up the live plist to <data dir>/plist-backups/, and
@@ -57,12 +67,13 @@
 # status   What's live, what's installed, and the install history.
 #
 # Settings come from the launchd plist (data dir, address, token file,
-# log); override with env: AVATAR_PLIST, AVATAR_BUILD_DIR (default
-# ~/agent-avatar-build), AVATAR_DATA_DIR (setup only), KEEP_RELEASES (5),
+# log); override with env: AVATAR_PLIST, AVATAR_MATRIX_PLIST,
+# AVATAR_BUILD_DIR (default ~/agent-avatar-build), AVATAR_DATA_DIR (setup only), KEEP_RELEASES (5),
 # KEEP_PLIST_BACKUPS (10). Tests set LAUNCHCTL and SUDO.
 set -euo pipefail
 
 PLIST=${AVATAR_PLIST:-/Library/LaunchDaemons/com.agent-avatar.server.plist}
+MATRIX_PLIST=${AVATAR_MATRIX_PLIST:-/Library/LaunchDaemons/com.agent-avatar.matrix.plist}
 BUILD_DIR=${AVATAR_BUILD_DIR:-$HOME/agent-avatar-build}
 KEEP_RELEASES=${KEEP_RELEASES:-5}
 KEEP_PLIST_BACKUPS=${KEEP_PLIST_BACKUPS:-10}
@@ -70,7 +81,9 @@ LAUNCHCTL=${LAUNCHCTL:-launchctl}
 SUDO=${SUDO-sudo}
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 BIN=agent-avatar-server
+MATRIX_BIN=agent-avatar-matrix
 UP_LINE="server up"
+MATRIX_UP="adapter up"
 DEFAULT_ADDR=127.0.0.1:8075
 TAG_RE='^v[0-9]{4}\.[0-9]{2}\.[0-9]+$'
 TRY_SRC="$BUILD_DIR/try-src"
@@ -124,11 +137,12 @@ previous_tag() { # newest history entry that isn't live and still exists
   done
 }
 
-install_plist() { # file: install it as the live plist, root:wheel 644
+install_plist() { # file [dest]: install it as the live plist, root:wheel 644
+  local dest=${2:-$PLIST}
   if [ -n "$SUDO" ]; then
-    $SUDO install -m 644 -o root -g wheel "$1" "$PLIST"
+    $SUDO install -m 644 -o root -g wheel "$1" "$dest"
   else
-    install -m 644 "$1" "$PLIST"
+    install -m 644 "$1" "$dest"
   fi
 }
 
@@ -187,6 +201,66 @@ EOF
   echo "next: scripts/deploy.sh build <tag>, then scripts/deploy.sh install <tag>"
 }
 
+# ── setup-matrix ───────────────────────────────────────────────────────
+cmd_setup_matrix() { # homeserver user room agent
+  local hs=$1 user=$2 room=$3 agent=$4 id_re='^[@!][^[:space:]:]+:[^[:space:]]+$'
+  [ -n "$hs" ] && [ -n "$user" ] && [ -n "$room" ] && [ -n "$agent" ] ||
+    die "usage: deploy.sh setup-matrix --homeserver URL --user @U:S --room !R:S --agent @A:S"
+  [[ $hs =~ ^https?://[^[:space:]]+$ ]] || die "--homeserver takes an http(s) URL"
+  [[ $user =~ $id_re && $user == @* ]] || die "--user takes @name:server"
+  [[ $agent =~ $id_re && $agent == @* ]] || die "--agent takes @name:server"
+  [[ $room =~ $id_re && $room == !* ]] || die "--room takes a room id, !id:server"
+  load_plist
+  [ ! -e "$MATRIX_PLIST" ] || die "$MATRIX_PLIST exists; change it with: scripts/deploy.sh env --matrix"
+  [ -t 0 ] || [ -z "$SUDO" ] || die "run setup-matrix in a terminal (sudo asks for a password)"
+  local tokf="$DATA/matrix-token"
+  [ -f "$tokf" ] || die "put $user's access token in $tokf (0600) first"
+  [ "$(stat -f %Lp "$tokf")" = 600 ] || die "$tokf must be mode 0600 (chmod 600 it)"
+  local logf="$HOME/Library/Logs/agent-avatar-matrix.log"
+  step "plist $MATRIX_PLIST"
+  local new
+  new=$(mktemp "${TMPDIR:-/tmp}/avatar-plist.XXXXXX")
+  /usr/bin/python3 -I - "$new" "$DATA" "$LISTEN" "$TOKEN_FILE" "$tokf" "$hs" "$user" \
+    "$room" "$agent" "$logf" "$(id -un)" <<'EOF'
+import plistlib, sys
+out, data, listen, avatar_tok, tokf, hs, user, room, agent, logf, who = sys.argv[1:]
+env = {
+    "AVATAR_DATA_DIR": data,
+    "AVATAR_URL": f"http://{listen}",
+    "MATRIX_HOMESERVER": hs,
+    "MATRIX_USER": user,
+    "MATRIX_ROOM": room,
+    "MATRIX_AGENT_USER": agent,
+    "MATRIX_TOKEN_FILE": tokf,
+}
+if avatar_tok:
+    env["AVATAR_TOKEN_FILE"] = avatar_tok
+plistlib.dump({
+    "Label": "com.agent-avatar.matrix",
+    "UserName": who,
+    "GroupName": "staff",
+    "ProgramArguments": [f"{data}/releases/current/agent-avatar-matrix"],
+    "WorkingDirectory": data,
+    "EnvironmentVariables": env,
+    "RunAtLoad": True,
+    "KeepAlive": True,
+    "ThrottleInterval": 30,
+    "StandardOutPath": logf,
+    "StandardErrorPath": logf,
+}, open(out, "wb"))
+EOF
+  plutil -lint -s "$new" || die "generated plist doesn't lint"
+  install_plist "$new" "$MATRIX_PLIST"
+  rm -f "$new"
+  echo "installed $MATRIX_PLIST"
+  if [ -x "$CUR/$MATRIX_BIN" ]; then
+    step "start the adapter"
+    start_adapter
+  else
+    echo "the live release has no $MATRIX_BIN; the adapter starts with the next install"
+  fi
+}
+
 # ── shared: check out, compile ─────────────────────────────────────────
 checkout_into() { # dir commit: a detached worktree of this repo at commit
   local src=$1 ref=$2
@@ -203,9 +277,9 @@ compile_into() { # src version dir: build src, copy the binary to dir
   local src=$1 ver=$2 dir=$3
   step "compile (AVATAR_VERSION=$ver)"
   (cd "$src" && export AVATAR_VERSION="$ver" CARGO_TARGET_DIR="$BUILD_DIR/target" &&
-    cargo build --release --locked -p "$BIN")
+    cargo build --release --locked -p "$BIN" -p "$MATRIX_BIN")
   mkdir -p "$dir"
-  cp -p "$BUILD_DIR/target/release/$BIN" "$dir/"
+  cp -p "$BUILD_DIR/target/release/$BIN" "$BUILD_DIR/target/release/$MATRIX_BIN" "$dir/"
 }
 
 # ── build ──────────────────────────────────────────────────────────────
@@ -243,22 +317,43 @@ cmd_build() {
 }
 
 # ── shared: stop, start, checks ────────────────────────────────────────
-loaded() { $SUDO "$LAUNCHCTL" print "system/$LABEL" >/dev/null 2>&1; }
+loaded() { $SUDO "$LAUNCHCTL" print "system/${1:-$LABEL}" >/dev/null 2>&1; }
 
-stop_server() {
-  if ! loaded; then
-    echo "not loaded; nothing to stop"
+svc_stop() { # label prog name
+  if ! loaded "$1"; then
+    echo "$3 not loaded; nothing to stop"
     return 0
   fi
-  STOPPED=1
-  $SUDO "$LAUNCHCTL" bootout "system/$LABEL" || die "bootout failed"
+  $SUDO "$LAUNCHCTL" bootout "system/$1" || die "bootout $1 failed"
   local _
   for _ in $(seq 1 30); do
-    pgrep -f "$PROG" >/dev/null || break
+    pgrep -f "$2" >/dev/null || break
     sleep 1
   done
-  ! pgrep -f "$PROG" >/dev/null || die "server still running after bootout"
-  echo "stopped"
+  ! pgrep -f "$2" >/dev/null || die "$3 still running after bootout"
+  echo "$3 stopped"
+}
+
+svc_start() { # plist log up-line: bootstrap, wait for up-line; 1 if it never came
+  local before=0 up=0 _
+  [ -z "$2" ] || [ ! -f "$2" ] || before=$(wc -l <"$2" | tr -d ' ')
+  $SUDO "$LAUNCHCTL" bootstrap system "$1" || die "bootstrap $1 failed"
+  [ -n "$2" ] || return 0
+  for _ in $(seq 1 60); do
+    if tail -n +"$((before + 1))" "$2" 2>/dev/null | grep -q "$3"; then
+      up=1
+      break
+    fi
+    sleep 1
+  done
+  echo "new log lines:"
+  tail -n +"$((before + 1))" "$2" 2>/dev/null | tail -15 | sed 's/^/   /'
+  [ "$up" = 1 ]
+}
+
+stop_server() {
+  STOPPED=1
+  svc_stop "$LABEL" "$PROG" server
 }
 
 log_lines() { # lines in the server log so far
@@ -266,23 +361,31 @@ log_lines() { # lines in the server log so far
 }
 
 start_server() {
-  local before up=0 _
   STOPPED=1
-  before=$(log_lines)
-  $SUDO "$LAUNCHCTL" bootstrap system "$PLIST" || die "bootstrap failed"
-  if [ -n "$LOG" ]; then
-    for _ in $(seq 1 60); do
-      if tail -n +"$((before + 1))" "$LOG" 2>/dev/null | grep -q "$UP_LINE"; then
-        up=1
-        break
-      fi
-      sleep 1
-    done
-    echo "new log lines:"
-    tail -n +"$((before + 1))" "$LOG" | tail -15 | sed 's/^/   /'
-    [ "$up" = 1 ] || die "no '$UP_LINE' in $LOG within 60s"
-  fi
+  svc_start "$PLIST" "$LOG" "$UP_LINE" || die "no '$UP_LINE' in $LOG within 60s"
   STOPPED=0
+}
+
+# The Matrix adapter, once setup-matrix installed its plist. It follows
+# the server: stopped first, started after, from the same release. Its
+# trouble is a warning: the display works without it.
+has_adapter() { [ -r "$MATRIX_PLIST" ]; }
+
+stop_adapter() {
+  has_adapter || return 0
+  svc_stop "$(pb Label "$MATRIX_PLIST")" "$(pb ProgramArguments:0 "$MATRIX_PLIST")" adapter
+}
+
+start_adapter() {
+  has_adapter || return 0
+  if [ ! -x "$CUR/$MATRIX_BIN" ]; then
+    echo "warning: $(live_tag) has no $MATRIX_BIN; the adapter stays stopped" >&2
+    return 0
+  fi
+  local log
+  log=$(pb StandardOutPath "$MATRIX_PLIST")
+  svc_start "$MATRIX_PLIST" "$log" "$MATRIX_UP" ||
+    echo "warning: no '$MATRIX_UP' in $log within 60s; check that log" >&2
 }
 
 mark_started() { # tag log-line: what verify reads the log from
@@ -434,7 +537,7 @@ env_key() { # key: refuse names that aren't env vars or look like secrets
   esac
 }
 
-ENV_YES=0 ENV_RESTART=0
+ENV_YES=0 ENV_RESTART=0 ENV_MATRIX=0
 env_apply() { # new-plist: lint, diff, ask, back up, install
   local new=$1 backups="$DATA/plist-backups" b
   plutil -lint -s "$new" || die "the edited plist doesn't lint; $PLIST is unchanged"
@@ -468,20 +571,35 @@ env_apply() { # new-plist: lint, diff, ask, back up, install
   if [ "$ENV_RESTART" = 1 ]; then
     load_plist
     [ -n "$(live_tag)" ] || die "--restart needs an installed release"
+    if [ "$ENV_MATRIX" = 1 ]; then
+      step "restart the adapter"
+      stop_adapter
+      start_adapter
+      return 0
+    fi
     step "restart $(live_tag)"
+    stop_adapter
     stop_server
     mark_started "$(live_tag)" "$(log_lines)"
     start_server
+    start_adapter
     run_checks "$(live_tag)"
   else
     echo "takes effect at the next start: install, rollback, or env --restart"
   fi
 }
 
-cmd_env() { # action args...
+cmd_env() { # [--matrix] action args...
+  if [ "${1:-}" = --matrix ]; then
+    ENV_MATRIX=1
+    shift
+    PLIST=$MATRIX_PLIST
+    [ -r "$PLIST" ] || die "no adapter plist $PLIST (scripts/deploy.sh setup-matrix)"
+  fi
+  [ $# -ge 1 ] || usage
   local action=$1
   shift
-  load_plist
+  load_plist # the adapter's plist names the data dir too
   if [ "$action" = list ]; then
     plutil -extract EnvironmentVariables json -o - "$PLIST" | /usr/bin/python3 -I -c '
 import json, sys
@@ -578,6 +696,7 @@ cmd_install() {
   [ -z "$SUDO" ] || $SUDO -v
 
   step "stop"
+  stop_adapter
   stop_server
   step "switch current to $tag"
   ln -sfn "$tag" "$CUR"
@@ -586,6 +705,7 @@ cmd_install() {
   mark_started "$tag" "$(log_lines)"
   step "start"
   start_server
+  start_adapter
   run_checks "$tag" "$extra"
   step "prune"
   prune
@@ -607,11 +727,13 @@ cmd_rollback() {
   [ "$tag" != "$live" ] || die "$tag is already live"
   step "roll back $live -> $tag"
   [ -z "$SUDO" ] || $SUDO -v
+  stop_adapter
   stop_server
   ln -sfn "$tag" "$CUR"
   echo "$(date '+%F %T') $tag rollback from $live" >>"$REL/history"
   mark_started "$tag" "$(log_lines)"
   start_server
+  start_adapter
   run_checks "$tag"
   printf '\n=== rolled back to %s ===\n' "$tag"
 }
@@ -664,6 +786,13 @@ cmd_status() {
   local v
   v=$(curl -s "http://$LISTEN/version" || true)
   echo "server says: ${v:-no answer on $LISTEN}"
+  if ! has_adapter; then
+    echo "adapter: not set up"
+  elif loaded "$(pb Label "$MATRIX_PLIST")"; then
+    echo "adapter: loaded"
+  else
+    echo "adapter: not loaded"
+  fi
   if [ -d "$REL" ]; then
     echo "installed: $(ls -t "$REL" | grep -E "$TAG_RE" | tr '\n' ' ')"
     echo "rollback target: $(previous_tag)"
@@ -673,7 +802,7 @@ cmd_status() {
 }
 
 usage() {
-  sed -n '4,13p' "$0" >&2
+  sed -n '4,14p' "$0" >&2
   exit 2
 }
 
@@ -689,6 +818,22 @@ setup)
     shift
   done
   cmd_setup "$addr"
+  ;;
+setup-matrix)
+  shift
+  hs= user= room= agent=
+  while [ $# -gt 0 ]; do
+    [ $# -ge 2 ] || usage
+    case $1 in
+    --homeserver) hs=$2 ;;
+    --user) user=$2 ;;
+    --room) room=$2 ;;
+    --agent) agent=$2 ;;
+    *) usage ;;
+    esac
+    shift 2
+  done
+  cmd_setup_matrix "$hs" "$user" "$room" "$agent"
   ;;
 try)
   shift
