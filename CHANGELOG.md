@@ -5,6 +5,12 @@ from 0 each month). Each section is drafted from commit subjects by
 git-cliff (`cliff.toml`) through `scripts/release.py`; big releases open
 with a short summary. See `docs/RELEASING.md`.
 
+## v2026.11.7 (2026-11-14)
+
+### Features
+
+- matrix: Speak streamed replies by the MSC4357 live mark, not by timing. While a reply streams, each sentence is spoken once more text follows it; the final edit speaks what wasn't said; tool progress ("Working" and backticked tool lines) is never spoken; a draft with no edit for 30 s counts as final. `MATRIX_SETTLE_MS` is removed (ho-ru7.14) ([63ce8e2](https://github.com/dpkirschner/agent-avatar/commit/63ce8e2))
+
 ## v2026.11.6 (2026-11-14)
 
 The agent now composes the display. One call, `POST /display`, picks a
