@@ -10,8 +10,9 @@
 #![allow(clippy::result_large_err)]
 
 use crate::config::Screen;
-use axum::extract::{Json, State};
+use axum::extract::{Json, Request, State};
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
+use axum::middleware::{self, Next};
 use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
@@ -163,12 +164,27 @@ pub fn router(state: Shared) -> Router {
         .route("/state", get(get_state))
         .route("/screens", get(get_screens))
         .route("/events", get(events))
+        .route("/heard", post(heard))
+        .merge(commands(state.clone()))
+        .with_state(state)
+}
+
+/// The agent's routes. The token layer runs before any extractor, so a
+/// caller without the token gets 401 before its body is read.
+fn commands(state: Shared) -> Router<Shared> {
+    Router::new()
         .route("/show", post(show))
         .route("/sprite", post(sprite))
         .route("/say", post(say))
-        .route("/heard", post(heard))
         .route("/heard/events", get(heard_events))
-        .with_state(state)
+        .route_layer(middleware::from_fn_with_state(state, require_token))
+}
+
+async fn require_token(State(st): State<Shared>, req: Request, next: Next) -> Response {
+    match authorized(&st, req.headers()) {
+        Ok(()) => next.run(req).await,
+        Err(r) => r,
+    }
 }
 
 // ---------- page ----------
@@ -327,10 +343,7 @@ struct ShowBody {
     screen: Option<String>,
 }
 
-async fn show(State(st): State<Shared>, headers: HeaderMap, Json(b): Json<ShowBody>) -> Response {
-    if let Err(r) = authorized(&st, &headers) {
-        return r;
-    }
+async fn show(State(st): State<Shared>, Json(b): Json<ShowBody>) -> Response {
     if let Some(name) = &b.screen {
         if !st.screens.iter().any(|s| &s.name == name) {
             return err(StatusCode::NOT_FOUND, format!("no screen named {name:?}"));
@@ -349,14 +362,7 @@ struct SpriteBody {
     state: Sprite,
 }
 
-async fn sprite(
-    State(st): State<Shared>,
-    headers: HeaderMap,
-    Json(b): Json<SpriteBody>,
-) -> Response {
-    if let Err(r) = authorized(&st, &headers) {
-        return r;
-    }
+async fn sprite(State(st): State<Shared>, Json(b): Json<SpriteBody>) -> Response {
     let mut cur = st.lock();
     st.set_sprite(&mut cur, b.state);
     Json(SpriteBody { state: cur.sprite }).into_response()
@@ -384,10 +390,7 @@ fn check_text(text: &str, max: usize) -> Result<String, Response> {
 
 /// Speak a line. The page shows `talking` while it plays; afterwards the
 /// avatar is `idle`, so the sprite state is set to idle here.
-async fn say(State(st): State<Shared>, headers: HeaderMap, Json(b): Json<TextBody>) -> Response {
-    if let Err(r) = authorized(&st, &headers) {
-        return r;
-    }
+async fn say(State(st): State<Shared>, Json(b): Json<TextBody>) -> Response {
     let text = match check_text(&b.text, MAX_SAY_CHARS) {
         Ok(t) => t,
         Err(r) => return r,
@@ -426,10 +429,7 @@ async fn heard(State(st): State<Shared>, Json(b): Json<TextBody>) -> Response {
 
 /// The adapters' stream of what the user said. Needs the token when one
 /// is set: it carries the user's words.
-async fn heard_events(State(st): State<Shared>, headers: HeaderMap) -> Response {
-    if let Err(r) = authorized(&st, &headers) {
-        return r;
-    }
+async fn heard_events(State(st): State<Shared>) -> Response {
     let rx = st.heard_tx.subscribe();
     let stream = BroadcastStream::new(rx).filter_map(|r| {
         r.ok().map(|h| {
@@ -573,6 +573,13 @@ mod tests {
         }
         let (s, _) = get(&app, "/heard/events").await;
         assert_eq!(s, StatusCode::UNAUTHORIZED);
+        // The token is checked before the body is read: a bare POST
+        // with no content type or body is 401, not 415.
+        for path in ["/show", "/sprite", "/say"] {
+            let req = Request::post(path).body(Body::empty()).unwrap();
+            let (s, _) = send(&app, req).await;
+            assert_eq!(s, StatusCode::UNAUTHORIZED, "{path} bare POST");
+        }
         // The page's own routes stay open.
         for path in ["/", "/app.js", "/state", "/screens", "/healthz"] {
             assert_eq!(get(&app, path).await.0, StatusCode::OK, "{path}");
