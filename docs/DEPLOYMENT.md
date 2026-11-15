@@ -48,8 +48,9 @@ switches back to the previous release; `status` shows what's live and
 installed.
 
 Before releasing, `scripts/deploy.sh try <branch>` runs a branch on
-127.0.0.1:8077 with the live screens config and a scratch token, so
-nothing live changes.
+127.0.0.1:8077 with the live screens config (or `--screens FILE`, for a
+screen the live server can't load yet) and a scratch token, so nothing
+live changes.
 
 ## 3. Settings
 
