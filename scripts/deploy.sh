@@ -788,7 +788,8 @@ cmd_status() {
   echo "server says: ${v:-no answer on $LISTEN}"
   if ! has_adapter; then
     echo "adapter: not set up"
-  elif loaded "$(pb Label "$MATRIX_PLIST")"; then
+  elif "$LAUNCHCTL" print "system/$(pb Label "$MATRIX_PLIST")" >/dev/null 2>&1; then
+    # No sudo: status runs without a terminal, and print doesn't need it.
     echo "adapter: loaded"
   else
     echo "adapter: not loaded"
