@@ -7,15 +7,17 @@ colors:
   ink: "#17173a"
   sunflower: "#ffc83d"
   tomato: "#e2462b"
+  tomato-deep: "#c03a1f"
   periwinkle-dim: "#d3daf8"
   slate-ink-dim: "#55546f"
   parchment-line: "#e6dcc6"
   leaf: "#2f7d52"
   amber: "#c0700f"
-  ochre: "#b8860b"
+  ochre: "#a87a0a"
   face-listening: "#ffd866"
   face-thinking: "#f5b52a"
   eye-white: "#fffaf0"
+  face-offline: "#b9b4a4"
 typography:
   said:
     fontFamily: "Fraunces, Georgia, serif"
@@ -56,6 +58,7 @@ rounded:
   button: "12px"
   start: "18px"
   card: "22px"
+  pill: "999px"
 spacing:
   gap: "18px"
   card-pad: "16px 20px 18px"
@@ -67,10 +70,16 @@ components:
     rounded: "{rounded.card}"
     padding: "16px 20px 18px"
   card-claim:
-    backgroundColor: "{colors.tomato}"
+    backgroundColor: "{colors.tomato-deep}"
     textColor: "{colors.cream}"
     rounded: "{rounded.card}"
     padding: "16px 20px 18px"
+  offline-pill:
+    backgroundColor: "{colors.tomato-deep}"
+    textColor: "{colors.cream}"
+    typography: "{typography.title}"
+    rounded: "{rounded.pill}"
+    padding: "2px 12px"
   mic:
     backgroundColor: "{colors.cream}"
     textColor: "{colors.ink}"
@@ -150,8 +159,10 @@ held together by one dark ink, with tomato as the alarm.
   text selection, and "hot" status items. It means *live* or *look here*.
 
 ### Secondary
-- **Tomato** (`tomato`): the claim card (a critical alert that takes the
-  content area), the connection-down dot, bad deltas, the second series.
+- **Tomato** (`tomato`): the connection-down dot and the second series.
+- **Tomato Deep** (`tomato-deep`): tomato wherever it carries text, for
+  AA contrast with cream (4.9:1; plain tomato is 3.7:1): the claim card
+  surface, the "Offline" pill, bad deltas on cream (`--bad-ink`).
 
 ### Neutral
 - **Cream** (`cream`): card and panel surfaces, mic at rest, the spoken
@@ -167,9 +178,11 @@ held together by one dark ink, with tomato as the alarm.
 
 ### Status and series
 - **Leaf** (`leaf`) good, **Amber** (`amber`) warning, **Ochre**
-  (`ochre`) third series; Leaf is also the fourth series.
+  (`ochre`) third series; Leaf is also the fourth series. Every series
+  colour holds at least 3:1 on cream (ochre 3.5:1).
 - Face tints per state: idle and talking Sunflower, listening
-  `face-listening`, thinking `face-thinking`; eye whites `eye-white`.
+  `face-listening`, thinking `face-thinking`, offline the greyed
+  `face-offline`; eye whites `eye-white`.
 
 ### Named Rules
 **The Two Grounds Rule.** Text sits on cobalt or on cream, never
@@ -181,7 +194,8 @@ highlighted. One sunflower highlight per card at most; a card that is
 mostly yellow has said nothing.
 
 **The Tomato Is an Alarm Rule.** Tomato fills a surface only for a claim
-card. Elsewhere it is a dot, a delta or a series, never decoration.
+card and the "Offline" pill. Elsewhere it is a dot, a delta or a series,
+never decoration.
 
 ## Typography
 
@@ -208,7 +222,8 @@ folder (`font-display: block`, so the page never flashes a fallback).
 - **Status** (Atkinson 600, 15px, tabular): the top and bottom status
   lines.
 - **Detail** (Atkinson 400, 15px): secondary lines, labels, the owner's
-  last line; axis text 13px.
+  last line, calendar day headings and transcript speaker lines (both
+  sentence case, 600–700 weight); axis text 13px.
 
 ### Named Rules
 **The Spoken Serif Rule.** Fraunces is for what the companion says or
@@ -216,7 +231,9 @@ names: the spoken line, titles, figures, the start button. Anything read
 as data or instructions is Atkinson.
 
 **The Sentence Case Rule.** Titles are sentence case at full title size.
-No small uppercase tracked labels (`--title-case: none`).
+No small uppercase tracked labels (`--title-case: none`), and no label
+smaller than the 15px detail size except axis text. The agent state
+word reads "Listening", "Thinking", "Talking", "Offline".
 
 ## Layout
 
@@ -227,11 +244,17 @@ from the agent.
 
 - **Presets (landscape columns):** default 62/38 face/content, `split`
   50/50, `focus` 24/76; no cards gives the face the whole stage. The
-  split animates over 0.4s.
+  split animates over 0.4s (not under reduced motion).
 - **Portrait** (fallback): the same presets become rows (62/38, 50/50,
   22/78), and in `focus` the face and subtitles sit side by side.
 - **Content column:** up to three cards stacked with an 18px gap, each
-  sharing the height unless it is marked to fit its content.
+  sharing the height unless it is marked to fit its content. Cards that
+  fit their content sit centred in the column, level with the face, so
+  a lone short card never leaves a void below it.
+- **Overflow:** nothing is cut off silently. A card body that doesn't
+  fit fades out over its last 2.2em; list items past the cut are counted
+  in a "+N more" detail line. Text cards first shrink to 15px. The
+  transcript, newest last, fades at the top instead.
 - **Rhythm:** one gap (18px) between cards and around the stage; card
   padding 16px 20px 18px; status lines padded 18px at the sides and
   respect the safe areas.
@@ -258,7 +281,7 @@ read as a button.
 ## Shapes
 
 Round, friendly and outlined. Cards are generously rounded (22px), the
-start button 18px, panel buttons 12px, fields 8px, progress bars 6px
+"Offline" pill fully round, the start button 18px, panel buttons 12px, fields 8px, progress bars 6px
 pills; the mic, status dots and alert dots are circles. Outlines are 3px
 ink on cards, the mic, the start button and claim cards, 2.5px on panel
 buttons and small marks, 2px on fields; the face line is 6px. Charts use
@@ -273,8 +296,13 @@ Cream pages held up beside the face.
 - **Background:** Cream, Ink text, Ink 3px outline, no drop.
 - **Title:** Fraunces title, sentence case, Ink.
 - **Internal Padding:** 16px 20px 18px, 10px between title and body.
-- **Claim:** a critical alert takes the content area as a Tomato card
-  with Cream text and the same outline.
+- **Claim:** a critical alert takes the content area as a Tomato Deep
+  card with Cream text at full opacity and the same outline; its level
+  marks are Cream (`--claim-dot`). Alert levels differ by shape as well
+  as colour: crit a circle, warn a diamond, info a small ring.
+- **Screen:** while its page loads, or when it can't be reached, the
+  card shows the screen's title and "Loading…" or "Can't reach …" on
+  cream; the frame covers it once loaded.
 - **Types:** text, list (ink dot bullets, Leaf ticks for done, Amber
   diamonds for warnings), figures (Value numerals with unit and delta),
   goals (12px cream bar, ink outline, Sunflower fill), chart (outlined
@@ -294,7 +322,8 @@ Top and bottom strips on the cobalt ground, no rule between them and the
 stage. Atkinson 600 15px in Periwinkle Dim, line icons drawn in
 currentColor, the agent's state word in Fraunces Cream, "hot" items
 Sunflower, a 10px connection dot (Tomato down, Sunflower up) ringed in
-Ink.
+Ink. When the server has been out of reach for 5s the state word
+becomes an "Offline" pill: Cream on Tomato Deep, ringed in Ink.
 
 ### Settings panel
 A cream card (22px, outlined) on a 95% cobalt overlay; buttons outlined
@@ -305,8 +334,21 @@ The `blob` avatar, dressed only through `--face-*` variables: a Sunflower
 body with a 6px Ink outline, eye whites, Ink pupils and mouth. Idle
 blinks every 5s and breathes; listening tints lighter, widens the eyes
 and pulses a cream ring; thinking tints deeper, looks up and blinks three
-cream dots; talking moves the mouth with the speech. Motion stops under
-reduced-motion.
+cream dots; talking moves the mouth with the speech. Offline (the page
+sets it while the server is out of reach) it sleeps: `face-offline`
+grey, eyes shut, no breathing or blinking. The mic turns Sunflower only
+while the page itself is listening. Motion stops under reduced-motion.
+
+### Page states for an unattended screen
+- **Offline:** the pill, the sleeping face, and the cards at 60%
+  opacity and mostly greyed (`--stale-opacity`), so old content doesn't
+  pass for live.
+- **Stale line:** the spoken line dims to 45% after 10s and fades out
+  after 3 minutes, so no text sits on the panel for days.
+- **Night:** after 10 minutes with nothing said, shown or touched, a
+  cobalt-black veil (`--night-dim`, 62%) fades in over 4s; any event,
+  speech or touch lifts it. A quiet timer, not a clock: the page has no
+  idea of the owner's hours.
 
 ## Do's and Don'ts
 

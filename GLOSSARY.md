@@ -5,7 +5,9 @@ have here.
 
 - **Avatar**: the agent's face on the page, drawn by an avatar module
   (`app/avatars/<name>/`), with a state (`idle`, `listening`,
-  `thinking`, `talking`) and a moving mouth. Chosen with `AVATAR_FACE`.
+  `thinking`, `talking`, and `offline`, which only the page sets while
+  the display server is out of reach) and a moving mouth. Chosen with
+  `AVATAR_FACE`.
 - **Display**: everything the agent sets with `POST /display`: the
   preset, the cards and the status lines (plus the avatar state).
 - **Preset**: how the avatar and the content share the stage: `chat`,
@@ -23,7 +25,9 @@ have here.
   built-in template (`app/status/<name>/`) with the agent's values in
   its slots.
 - **Subtitles**: the agent's current line under the avatar, revealed
-  word by word as it speaks.
+  word by word as it speaks, three lines at a time.
+- **Night**: the page dimmed under a veil after a quiet spell, to
+  spare an always-on screen; anything at all lifts it.
 - **Kiosk page**: the full-screen web page that renders the avatar on
   the tablet. One page, served by the display server.
 - **Display server**: the HTTP service that agents call and that pushes
