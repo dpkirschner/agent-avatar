@@ -5,6 +5,13 @@ from 0 each month). Each section is drafted from commit subjects by
 git-cliff (`cliff.toml`) through `scripts/release.py`; big releases open
 with a short summary. See `docs/RELEASING.md`.
 
+## v2026.11.5 (2026-11-14)
+
+### Fixes
+
+- app: Speech recognition errors show on the page instead of the Talk button silently resetting. A browser without a speech service (Brave and other Chromium builds) is told to use Safari or Chrome (ho-ru7.6) ([9a9ee9e](https://github.com/dpkirschner/agent-avatar/commit/9a9ee9e))
+- server: `/status` `page_seen_secs` counts from server start until a page connects, never `null`, so a monitor can't read "no page yet" as fresh (ho-ru7.9) ([4aaebd8](https://github.com/dpkirschner/agent-avatar/commit/4aaebd8))
+
 ## v2026.11.4 (2026-11-14)
 
 ### Features
