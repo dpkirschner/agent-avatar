@@ -91,7 +91,8 @@ framing the origins listed in the screens config.
 
 ## 7. Tablet
 
-In Safari: open the URL, tap "Tap to start", allow the microphone on
+In Safari: open the URL, tap "Tap to start", paste the token from the
+token file into the settings that open, then allow the microphone on
 the first "Talk". For a kiosk, use Add to Home Screen, or Guided
 Access (Settings › Accessibility) to lock the tablet to Safari. Other
 iOS browsers can't use speech recognition.
