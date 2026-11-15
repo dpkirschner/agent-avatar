@@ -2,9 +2,15 @@
 //! `$OUT_DIR/assets.rs` with every file under `app/` as
 //! `(path, bytes)`, sorted by path. Adding a card, status template,
 //! theme or avatar folder needs no Rust change to be served.
+//!
+//! Nothing here may hold an absolute path: deploy.sh builds several
+//! worktrees into one target dir, and Cargo reuses this script's output
+//! across them. The watched path is relative to the package and the
+//! generated `include_bytes!` resolve through `CARGO_MANIFEST_DIR` at
+//! compile time, so each worktree embeds its own `app/`.
 use std::path::{Path, PathBuf};
 
-fn walk(dir: &Path, root: &Path, out: &mut Vec<(String, PathBuf)>) {
+fn walk(dir: &Path, root: &Path, out: &mut Vec<String>) {
     let mut entries: Vec<_> = std::fs::read_dir(dir)
         .unwrap_or_else(|e| panic!("read {}: {e}", dir.display()))
         .map(|e| e.unwrap().path())
@@ -23,21 +29,21 @@ fn walk(dir: &Path, root: &Path, out: &mut Vec<(String, PathBuf)>) {
                 .unwrap()
                 .to_string_lossy()
                 .replace('\\', "/");
-            out.push((rel, p.canonicalize().unwrap()));
+            out.push(rel);
         }
     }
 }
 
 fn main() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../app");
-    println!("cargo:rerun-if-changed={}", root.display());
+    // Relative to the package root, so it means this worktree's app/.
+    println!("cargo:rerun-if-changed=../app");
     let mut files = Vec::new();
     walk(&root, &root, &mut files);
     let mut src = String::from("pub static FILES: &[(&str, &[u8])] = &[\n");
-    for (rel, abs) in &files {
+    for rel in &files {
         src.push_str(&format!(
-            "    ({rel:?}, include_bytes!({:?})),\n",
-            abs.display().to_string()
+            "    ({rel:?}, include_bytes!(concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/../app/\", {rel:?}))),\n"
         ));
     }
     src.push_str("];\n");

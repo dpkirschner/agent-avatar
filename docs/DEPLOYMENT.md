@@ -132,3 +132,9 @@ token file into the settings that open, then allow the microphone on
 the first "Talk". For a kiosk, use Add to Home Screen, or Guided
 Access (Settings › Accessibility) to lock the tablet to Safari. Other
 iOS browsers can't use speech recognition.
+
+When Talk does nothing useful, turn on "Debug log" in settings: a
+timestamped trace on the right shows whether the page is connected,
+each speech-recognition step and error, what it thought you said, and
+whether `POST /heard` reached an agent. Copy puts the trace on the
+clipboard. ARCHITECTURE (Kiosk page) explains how to read it.

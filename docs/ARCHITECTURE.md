@@ -137,7 +137,19 @@ avatar, app.
   any event, speech or touch lifts it.
 - **Settings.** Hold the top-left corner for 0.8 s: continuous
   listening, browser voice and rate (kept in `localStorage`), full
-  screen, reload.
+  screen, reload, and the debug log.
+- **Debug log.** The page always keeps a timestamped trace in memory
+  (the last 400 lines): the event stream opening and dropping, every
+  speech-recognition step (`sr-start`, `sr-audiostart`,
+  `sr-speechstart`, partial and final text with alternatives and
+  confidence, errors by code, `sr-end`), the microphones the browser
+  sees (and when that changes), `POST /heard` with its outcome, speech
+  out, and page errors. "Debug log" in settings shows it in a panel
+  on the right (the stage narrows); Copy puts it on the clipboard.
+  The setting is kept in `localStorage`. Reading a failed Talk press:
+  no `sr-audiostart` means the mic never opened; `sr-audiostart` with
+  no `sr-speechstart` means it heard nothing it took for speech;
+  `heard-refused` means a missing or wrong token.
 
 Browser notes from the prototype:
 

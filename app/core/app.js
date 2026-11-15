@@ -20,6 +20,84 @@ const store = {
 // what the page hears reaches the agent as if the owner said it.
 let token = store.get('token', '');
 
+// ---------- debug log ----------
+
+// A timestamped trace of what the page did and what the browser told it:
+// the event stream, each step of speech recognition (with what it thought
+// it heard), POST /heard, speech out, page errors. Always kept in memory
+// (the last DBG_MAX lines); Settings › Debug log shows it in a side panel.
+// Agent and speech text only ever reach the DOM as textContent.
+const DBG_MAX = 400;
+const dbgLines = [];
+const dbgBox = $('#debug-log');
+let dbgShown = false;
+
+function stamp() {
+  const d = new Date();
+  return d.toTimeString().slice(0, 8) + '.' + String(d.getMilliseconds()).padStart(3, '0');
+}
+
+function fmtData(data) {
+  return Object.entries(data)
+    .filter(([, v]) => v !== undefined && v !== null && v !== '')
+    .map(([k, v]) => k + '=' + (typeof v === 'number' || typeof v === 'boolean' ? v : JSON.stringify(v)))
+    .join(' ');
+}
+
+function short(text, n = 80) {
+  text = String(text);
+  return text.length > n ? text.slice(0, n - 1) + '…' : text;
+}
+
+function dbgRow(line) {
+  const row = el('div', 'dl' + (line.level ? ' ' + line.level : ''));
+  row.append(el('span', 'dt', line.t), el('span', 'de', line.ev), el('span', 'dd', line.text));
+  line.row = row;
+  return row;
+}
+
+function dbgFollow(fn) {
+  const atEnd = dbgBox.scrollHeight - dbgBox.scrollTop - dbgBox.clientHeight < 40;
+  fn();
+  if (atEnd) dbgBox.scrollTop = dbgBox.scrollHeight;
+}
+
+// level: '' | 'good' | 'warn' | 'bad'
+function dbg(ev, data = {}, level = '') {
+  const line = { t: stamp(), ev, text: fmtData(data), level, row: null };
+  dbgLines.push(line);
+  const old = dbgLines.length > DBG_MAX ? dbgLines.shift() : null;
+  if (!dbgShown) return;
+  dbgFollow(() => {
+    if (old && old.row) old.row.remove();
+    dbgBox.append(dbgRow(line));
+  });
+}
+
+// Partial transcripts arrive many times a second: one line that updates.
+function dbgInterim(text) {
+  const last = dbgLines[dbgLines.length - 1];
+  if (!last || last.ev !== 'sr-interim') { dbg('sr-interim', { text }); return; }
+  last.t = stamp();
+  last.text = fmtData({ text });
+  if (last.row) dbgFollow(() => last.row.replaceWith(dbgRow(last)));
+}
+
+function showDebug(on) {
+  dbgShown = on;
+  $('#debug').hidden = !on;
+  app.classList.toggle('debugging', on);
+  dbgBox.textContent = '';
+  for (const l of dbgLines) l.row = null;
+  if (on) {
+    dbgBox.append(...dbgLines.map(dbgRow));
+    dbgBox.scrollTop = dbgBox.scrollHeight;
+  }
+}
+
+addEventListener('error', (e) => dbg('js-error', { msg: e.message, at: e.filename ? e.filename.split('/').pop() + ':' + e.lineno : '' }, 'bad'));
+addEventListener('unhandledrejection', (e) => dbg('js-rejection', { msg: String(e.reason) }, 'bad'));
+
 class Refused extends Error {}
 
 async function postJSON(path, body) {
@@ -271,6 +349,7 @@ let unlocked = false;
 function unlock() {
   if (unlocked) return;
   unlocked = true;
+  dbg('unlock');
   player.src = SILENT;
   player.play().catch(() => {});
   if (synth) {
@@ -287,17 +366,19 @@ async function keepAwake() {
   if (wake || !('wakeLock' in navigator)) return;
   try {
     wake = await navigator.wakeLock.request('screen');
-    wake.addEventListener('release', () => { wake = null; });
-  } catch { /* not allowed now; retried on the next visibility change */ }
+    dbg('wakelock', {}, 'good');
+    wake.addEventListener('release', () => { wake = null; dbg('wakelock-released'); });
+  } catch (e) { dbg('wakelock-error', { err: String(e) }, 'warn'); } // retried on the next visibility change
 }
 document.addEventListener('visibilitychange', () => {
+  dbg('visibility', { state: document.visibilityState });
   if (document.visibilityState === 'visible' && unlocked) keepAwake();
 });
 
 function goFullscreen() {
   const el = document.documentElement;
   const f = el.requestFullscreen || el.webkitRequestFullscreen;
-  if (f) Promise.resolve(f.call(el)).catch(() => {});
+  if (f) Promise.resolve(f.call(el)).catch((e) => dbg('fullscreen-error', { err: String(e) }, 'warn'));
 }
 
 $('#start-btn').addEventListener('click', () => {
@@ -360,11 +441,17 @@ function playAudio(line, done) {
     if (n !== follow.n) { follow.n = n; revealTo(n); pulseMouth(); }
     raf = requestAnimationFrame(follow);
   };
-  const end = () => { cancelAnimationFrame(raf); done(); };
+  const end = () => { cancelAnimationFrame(raf); dbg('audio-end'); done(); };
+  const fallback = (err) => {
+    cancelAnimationFrame(raf);
+    dbg('audio-failed', { err, then: 'browser voice' }, 'warn');
+    speakText(line.text, done);
+  };
   player.onended = end;
-  player.onerror = () => { cancelAnimationFrame(raf); speakText(line.text, done); };
+  player.onerror = () => fallback(player.error ? 'media error ' + player.error.code : 'media error');
   player.src = line.audio;
-  player.play().then(() => { if (words) follow(); }).catch(() => { cancelAnimationFrame(raf); speakText(line.text, done); });
+  player.play().then(() => { dbg('audio-start', { words: words ? words.length : 0 }); if (words) follow(); })
+    .catch((e) => fallback(e.name || String(e)));
 }
 
 // Where each timed word ends in the text, matched in order.
@@ -386,23 +473,25 @@ function wordOffsets(text, words) {
 function speakText(text, done) {
   showLine(text, true);
   const whole = setTimeout(() => { if (!lastBoundary) revealTo(text.length); }, 700);
-  if (!synth) { revealTo(text.length); setTimeout(done, 1500); return; }
+  if (!synth) { dbg('tts-none', {}, 'warn'); revealTo(text.length); setTimeout(done, 1500); return; }
   synth.cancel();
   const u = new SpeechSynthesisUtterance(text);
   const v = voices.find((x) => x.voiceURI === store.get('voice', ''));
   if (v) u.voice = v;
   u.rate = +store.get('rate', '1');
+  const asked = performance.now();
   // Safari sometimes never fires `end`; don't stay stuck talking.
-  const guard = setTimeout(finish, 4000 + text.length * 120);
+  const guard = setTimeout(() => { dbg('tts-stuck', { note: 'no end event; moving on' }, 'warn'); finish(); }, 4000 + text.length * 120);
   function finish() { clearTimeout(guard); clearTimeout(whole); done(); }
+  u.onstart = () => dbg('tts-start', { voice: v ? v.name : 'default', lagMs: Math.round(performance.now() - asked) });
   u.onboundary = (e) => {
     if (e.name && e.name !== 'word') return;
     pulseMouth();
     const i = e.charIndex || 0;
     revealTo(e.charLength ? i + e.charLength : wordEnd(text, i));
   };
-  u.onend = finish;
-  u.onerror = finish;
+  u.onend = () => { dbg('tts-end'); finish(); };
+  u.onerror = (e) => { dbg('tts-error', { err: e.error }, 'bad'); finish(); };
   synth.speak(u);
 }
 
@@ -441,25 +530,59 @@ const RECOGNITION_ERRORS = {
 };
 function warn(msg) { const w = $('#warn'); w.textContent = msg; w.hidden = false; }
 
+// The microphones the browser can see. Labels show only once the page
+// has mic permission; a count that changes means a headset came or went.
+async function logMics(why) {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+  try {
+    const mics = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audioinput');
+    dbg('mics', { why, n: mics.length, names: mics.map((d) => d.label || '(no label)').join(', ') }, mics.length ? '' : 'bad');
+  } catch (e) {
+    dbg('mics-error', { err: String(e) }, 'warn');
+  }
+}
+if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+  navigator.mediaDevices.addEventListener('devicechange', () => logMics('changed'));
+}
+
 function startListening() {
   if (!SR || listening) return;
   rec = new SR();
   rec.lang = navigator.language || 'en-US';
   rec.interimResults = true;
+  rec.maxAlternatives = 3;
   rec.continuous = continuous;
   lastInterim = '';
-  rec.onstart = () => { listening = true; render(); };
+  // Each step, so a silent failure shows where it stopped: no `audiostart`
+  // means the mic never opened; `audiostart` with no `speechstart` means
+  // it heard nothing it took for speech.
+  const t0 = performance.now();
+  const since = () => Math.round(performance.now() - t0);
+  let gotFinal = false;
+  rec.onstart = () => { listening = true; render(); dbg('sr-start', { lang: rec.lang, continuous }, 'good'); logMics('listening'); };
+  rec.onaudiostart = () => dbg('sr-audiostart', { ms: since() });
+  rec.onsoundstart = () => dbg('sr-soundstart', { ms: since() });
+  rec.onspeechstart = () => dbg('sr-speechstart', { ms: since() }, 'good');
+  rec.onspeechend = () => dbg('sr-speechend', { ms: since() });
+  rec.onsoundend = () => dbg('sr-soundend', { ms: since() });
+  rec.onaudioend = () => dbg('sr-audioend', { ms: since() });
+  rec.onnomatch = () => dbg('sr-nomatch', {}, 'warn');
   rec.onresult = (e) => {
     let interim = '';
     for (let i = e.resultIndex; i < e.results.length; i++) {
       const r = e.results[i];
-      if (r.isFinal) finish(r[0].transcript);
-      else interim += r[0].transcript;
+      if (r.isFinal) {
+        gotFinal = true;
+        const alts = Array.from(r, (a) => a.transcript.trim() + ' (' + (a.confidence || 0).toFixed(2) + ')');
+        dbg('sr-final', { text: r[0].transcript.trim(), alts: alts.join(' | ') }, 'good');
+        finish(r[0].transcript);
+      } else interim += r[0].transcript;
     }
-    if (interim) lastInterim = interim;
+    if (interim) { lastInterim = interim; dbgInterim(interim); }
     $('#interim').textContent = interim;
   };
   rec.onerror = (e) => {
+    dbg('sr-error', { err: e.error, msg: e.message, ms: since() }, e.error === 'aborted' || e.error === 'no-speech' ? 'warn' : 'bad');
     // `aborted` is us (pauseListening); `no-speech` just ends the turn.
     if (e.error === 'aborted' || e.error === 'no-speech') return;
     wantListening = false; // don't let continuous mode retry a failure
@@ -467,25 +590,27 @@ function startListening() {
   };
   rec.onend = () => {
     listening = false;
+    dbg('sr-end', { ms: since(), gotFinal, lastInterim: lastInterim.trim() }, gotFinal || lastInterim.trim() ? '' : 'warn');
     // Safari often never marks a result final: use the last interim.
-    if (lastInterim.trim()) finish(lastInterim);
+    if (lastInterim.trim()) { dbg('sr-final-from-interim', { text: lastInterim.trim() }, 'warn'); finish(lastInterim); }
     $('#interim').textContent = '';
     render();
     // iOS ends each session after one utterance; restart to keep going.
     if (continuous && wantListening && !speaking) startListening();
   };
-  try { rec.start(); } catch { listening = false; render(); }
+  try { rec.start(); } catch (e) { dbg('sr-start-error', { err: String(e) }, 'bad'); listening = false; render(); }
 }
 
 function stopListening() {
   wantListening = false;
-  if (rec && listening) rec.stop();
+  if (rec && listening) { dbg('sr-stop'); rec.stop(); }
 }
 
 function pauseListening() {
   if (rec && listening) {
     resumeAfterSpeech = continuous && wantListening;
     wantListening = false;
+    dbg('sr-abort', { why: 'avatar speaking' });
     rec.abort(); // don't hear our own voice
   }
 }
@@ -513,20 +638,29 @@ async function finish(text) {
   h.textContent = text;
   remember('you', text);
   if (!continuous && rec && listening) rec.stop();
+  const t0 = performance.now();
+  dbg('heard-send', { text: short(text) });
   try {
     const r = await postJSON('heard', { text });
-    if (!r.delivered_to) note('“' + text + '”: no agent is listening right now.');
+    const ms = Math.round(performance.now() - t0);
+    if (!r.delivered_to) {
+      dbg('heard-undelivered', { ms, note: 'no adapter listening' }, 'warn');
+      note('“' + text + '”: no agent is listening right now.');
+    } else dbg('heard-ok', { ms, delivered_to: r.delivered_to }, 'good');
   } catch (e) {
     if (e instanceof Refused) {
+      dbg('heard-refused', { status: 401, token: token ? 'wrong, ends …' + token.slice(-4) : 'missing' }, 'bad');
       note('“' + text + '”: the display server wants its token. Paste it in Settings.');
       openSettings(true);
     } else {
+      dbg('heard-failed', { err: e.message }, 'bad');
       note('“' + text + '”: could not reach the display server.');
     }
   }
 }
 
 $('#mic').addEventListener('click', () => {
+  dbg('mic-tap', { listening, speaking });
   unlock();
   if (listening) { stopListening(); return; }
   if (speaking) stopSpeaking();
@@ -557,17 +691,23 @@ function setLink(up) {
 function connect() {
   const es = new EventSource('events');
   setLink(false); // until it opens
-  es.onopen = () => setLink(true);
+  es.onopen = () => { dbg('sse-open', {}, 'good'); setLink(true); };
   // EventSource retries on its own; the status line says we're offline.
-  es.onerror = () => setLink(false);
+  es.onerror = () => {
+    dbg('sse-error', { state: es.readyState === EventSource.CLOSED ? 'closed' : 'reconnecting' }, 'warn');
+    setLink(false);
+  };
   const on = (name, fn) => es.addEventListener(name, (e) => {
     let data;
-    try { data = JSON.parse(e.data); } catch { return; }
+    try { data = JSON.parse(e.data); } catch { dbg('sse-bad', { event: name, data: short(e.data) }, 'bad'); return; }
     fn(data);
   });
-  on('display', (d) => { stir(); renderDisplay(d); });
-  on('avatar', (d) => { stir(); serverState = d.state; render(); });
-  on('say', (d) => { stir(); enqueue(d); });
+  on('display', (d) => {
+    dbg('display', { preset: d.preset, cards: Array.isArray(d.content) ? d.content.map((c) => c && c.type).join(',') : '' });
+    stir(); renderDisplay(d);
+  });
+  on('avatar', (d) => { dbg('avatar', { state: d.state }); stir(); serverState = d.state; render(); });
+  on('say', (d) => { dbg('say', { text: short(d.text || ''), audio: !!d.audio }); stir(); enqueue(d); });
 }
 connect();
 
@@ -615,6 +755,7 @@ $('#token').addEventListener('input', (e) => {
   token = e.target.value.trim();
   store.set('token', token);
 });
+$('#token').addEventListener('change', () => dbg('token-set', { token: token ? 'ends …' + token.slice(-4) : 'cleared', length: token.length }));
 
 $('#continuous').checked = continuous;
 $('#continuous').addEventListener('change', (e) => {
@@ -638,4 +779,29 @@ $('#fullscreen').addEventListener('click', goFullscreen);
 $('#reload').addEventListener('click', () => location.reload());
 $('#close-settings').addEventListener('click', () => { settings.hidden = true; });
 
+$('#debug-on').checked = store.get('debug', '0') === '1';
+$('#debug-on').addEventListener('change', (e) => {
+  store.set('debug', e.target.checked ? '1' : '0');
+  showDebug(e.target.checked);
+});
+$('#debug-close').addEventListener('click', () => {
+  store.set('debug', '0');
+  $('#debug-on').checked = false;
+  showDebug(false);
+});
+$('#debug-clear').addEventListener('click', () => { dbgLines.length = 0; dbgBox.textContent = ''; });
+$('#debug-copy').addEventListener('click', () => {
+  const text = dbgLines.map((l) => l.t + ' ' + l.ev + (l.text ? ' ' + l.text : '')).join('\n');
+  const b = $('#debug-copy');
+  const say = (word) => { b.textContent = word; setTimeout(() => { b.textContent = 'Copy'; }, 1500); };
+  if (!navigator.clipboard) { say('No clipboard'); return; }
+  navigator.clipboard.writeText(text).then(() => say('Copied'), () => say('Not allowed'));
+});
+showDebug($('#debug-on').checked);
+
+dbg('load', {
+  sr: !!SR, tts: !!synth, secure: isSecureContext,
+  // The last 4 characters only: enough to tell which token it is.
+  token: token ? 'ends …' + token.slice(-4) : 'missing', ua: navigator.userAgent,
+});
 render();
