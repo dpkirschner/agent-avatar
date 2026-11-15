@@ -5,6 +5,16 @@ from 0 each month). Each section is drafted from commit subjects by
 git-cliff (`cliff.toml`) through `scripts/release.py`; big releases open
 with a short summary. See `docs/RELEASING.md`.
 
+## v2026.11.4 (2026-11-14)
+
+### Features
+
+- server: Open `GET /status` for monitoring: `{"pages", "page_seen_secs", "adapters"}`, the pages and adapters connected now and seconds since a page was last connected. Counts only, no content. The install checks fetch it (ho-ru7.9) ([617c94f](https://github.com/dpkirschner/agent-avatar/commit/617c94f), [15d939d](https://github.com/dpkirschner/agent-avatar/commit/15d939d))
+
+### Fixes
+
+- deploy: `status` reads the adapter's launchd state without sudo, so it no longer says "not loaded" for a running adapter (ho-ru7.7) ([71a66e3](https://github.com/dpkirschner/agent-avatar/commit/71a66e3))
+
 ## v2026.11.3 (2026-11-14)
 
 The Matrix adapter: what you say to the tablet goes to the agent's
