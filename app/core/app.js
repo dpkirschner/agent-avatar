@@ -649,7 +649,7 @@ async function finish(text) {
     } else dbg('heard-ok', { ms, delivered_to: r.delivered_to }, 'good');
   } catch (e) {
     if (e instanceof Refused) {
-      dbg('heard-refused', { status: 401, token: token ? 'wrong' : 'missing' }, 'bad');
+      dbg('heard-refused', { status: 401, token: token ? 'wrong, ends …' + token.slice(-4) : 'missing' }, 'bad');
       note('“' + text + '”: the display server wants its token. Paste it in Settings.');
       openSettings(true);
     } else {
@@ -755,6 +755,7 @@ $('#token').addEventListener('input', (e) => {
   token = e.target.value.trim();
   store.set('token', token);
 });
+$('#token').addEventListener('change', () => dbg('token-set', { token: token ? 'ends …' + token.slice(-4) : 'cleared', length: token.length }));
 
 $('#continuous').checked = continuous;
 $('#continuous').addEventListener('change', (e) => {
@@ -800,6 +801,7 @@ showDebug($('#debug-on').checked);
 
 dbg('load', {
   sr: !!SR, tts: !!synth, secure: isSecureContext,
-  token: token ? 'set' : 'missing', ua: navigator.userAgent,
+  // The last 4 characters only: enough to tell which token it is.
+  token: token ? 'ends …' + token.slice(-4) : 'missing', ua: navigator.userAgent,
 });
 render();
