@@ -164,18 +164,20 @@ pub fn router(state: Shared) -> Router {
         .route("/state", get(get_state))
         .route("/screens", get(get_screens))
         .route("/events", get(events))
-        .route("/heard", post(heard))
         .merge(commands(state.clone()))
         .with_state(state)
 }
 
-/// The agent's routes. The token layer runs before any extractor, so a
-/// caller without the token gets 401 before its body is read.
+/// The routes that act: the agent's commands, and `heard`, whose text
+/// reaches the agent as if the owner said it. The token layer runs before
+/// any extractor, so a caller without the token gets 401 before its body is
+/// read. The page sends the token too (set once in its settings).
 fn commands(state: Shared) -> Router<Shared> {
     Router::new()
         .route("/show", post(show))
         .route("/sprite", post(sprite))
         .route("/say", post(say))
+        .route("/heard", post(heard))
         .route("/heard/events", get(heard_events))
         .route_layer(middleware::from_fn_with_state(state, require_token))
 }
@@ -408,8 +410,8 @@ async fn say(State(st): State<Shared>, Json(b): Json<TextBody>) -> Response {
     Json(said).into_response()
 }
 
-/// What the user said on the page. Open to the page (no token): it goes
-/// to adapters on `/heard/events`, and the avatar turns `thinking`.
+/// What the user said on the page. Needs the token: it goes to adapters
+/// on `/heard/events`, and the avatar turns `thinking`.
 async fn heard(State(st): State<Shared>, Json(b): Json<TextBody>) -> Response {
     let text = match check_text(&b.text, MAX_HEARD_CHARS) {
         Ok(t) => t,
@@ -557,25 +559,26 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn token_guards_commands_and_heard_stream_not_page() {
+    async fn token_guards_commands_and_heard_not_page() {
         let (app, _) = app(Some("s3cret"));
-        for (path, body) in [
-            ("/show", r#"{"screen":"status"}"#),
-            ("/sprite", r#"{"state":"idle"}"#),
-            ("/say", r#"{"text":"hi"}"#),
+        for (path, body, ok) in [
+            ("/show", r#"{"screen":"status"}"#, StatusCode::OK),
+            ("/sprite", r#"{"state":"idle"}"#, StatusCode::OK),
+            ("/say", r#"{"text":"hi"}"#, StatusCode::OK),
+            ("/heard", r#"{"text":"hi"}"#, StatusCode::ACCEPTED),
         ] {
             let (s, _) = send(&app, post_json(path, body, None)).await;
             assert_eq!(s, StatusCode::UNAUTHORIZED, "{path} without token");
             let (s, _) = send(&app, post_json(path, body, Some("wrong"))).await;
             assert_eq!(s, StatusCode::UNAUTHORIZED, "{path} wrong token");
             let (s, _) = send(&app, post_json(path, body, Some("s3cret"))).await;
-            assert_eq!(s, StatusCode::OK, "{path} right token");
+            assert_eq!(s, ok, "{path} right token");
         }
         let (s, _) = get(&app, "/heard/events").await;
         assert_eq!(s, StatusCode::UNAUTHORIZED);
         // The token is checked before the body is read: a bare POST
         // with no content type or body is 401, not 415.
-        for path in ["/show", "/sprite", "/say"] {
+        for path in ["/show", "/sprite", "/say", "/heard"] {
             let req = Request::post(path).body(Body::empty()).unwrap();
             let (s, _) = send(&app, req).await;
             assert_eq!(s, StatusCode::UNAUTHORIZED, "{path} bare POST");
@@ -584,8 +587,6 @@ mod tests {
         for path in ["/", "/app.js", "/state", "/screens", "/healthz"] {
             assert_eq!(get(&app, path).await.0, StatusCode::OK, "{path}");
         }
-        let (s, _) = send(&app, post_json("/heard", r#"{"text":"hi"}"#, None)).await;
-        assert_eq!(s, StatusCode::ACCEPTED);
     }
 
     #[tokio::test]

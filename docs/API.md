@@ -6,13 +6,16 @@ fields; errors come back as `{"error": "..."}`.
 ## Auth
 
 With a command token configured (`AVATAR_TOKEN_FILE`, a 0600 file, or
-`AVATAR_TOKEN`), the commands and the heard stream need
-`Authorization: Bearer <token>`; without it they answer `401`. With no
+`AVATAR_TOKEN`), the commands, `POST /heard` and the heard stream need
+`Authorization: Bearer <token>`; without it they answer `401`, before
+the body is read. `POST /heard` is guarded because its text reaches the
+agent as if the owner said it. The page sends the token once it is
+pasted into its settings (it asks on the first start tap). With no
 token everything is open to whatever can reach the port, and the
 server logs a warning at startup.
 
 The page's own routes are always open: the page, its event stream,
-`/state`, `/screens` and `POST /heard`. Keep the server behind a
+`/state` and `/screens`. Keep the server behind a
 private network (loopback plus a tailnet-only proxy is the intended
 setup).
 
@@ -38,7 +41,7 @@ setup).
 
 | Method | Path            | Auth  | Effect |
 |--------|-----------------|-------|--------|
-| POST   | `/heard`        | open  | The page sends a finished utterance: `{"text": "..."}` (1–1000 characters). Answers `202 {"delivered_to": N}`, the number of adapters listening. When N > 0 the sprite turns `thinking`. |
+| POST   | `/heard`        | token | The page sends a finished utterance: `{"text": "..."}` (1–1000 characters). Answers `202 {"delivered_to": N}`, the number of adapters listening. When N > 0 the sprite turns `thinking`. |
 | GET    | `/heard/events` | token | SSE stream for adapters: one `heard` event per utterance, `data: {"text": "..."}`. Nothing is buffered: an adapter sees only what is said while it is connected. |
 
 ## Events (server → page)

@@ -14,12 +14,17 @@ const store = {
   set(k, v) { try { localStorage.setItem('avatar.' + k, v); } catch { /* private mode */ } },
 };
 
+// The display server's token, pasted once into settings. `heard` needs it:
+// what the page hears reaches the agent as if the owner said it.
+let token = store.get('token', '');
+
+class Refused extends Error {}
+
 async function postJSON(path, body) {
-  const res = await fetch(path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = 'Bearer ' + token;
+  const res = await fetch(path, { method: 'POST', headers, body: JSON.stringify(body) });
+  if (res.status === 401) throw new Refused(path);
   if (!res.ok) throw new Error(path + ' ' + res.status);
   return res.json();
 }
@@ -109,7 +114,11 @@ function goFullscreen() {
   if (f) Promise.resolve(f.call(el)).catch(() => {});
 }
 
-$('#start-btn').addEventListener('click', () => { unlock(); goFullscreen(); });
+$('#start-btn').addEventListener('click', () => {
+  unlock();
+  goFullscreen();
+  if (!token) openSettings(true); // first run: ask for the token up front
+});
 
 // ---------- speech out ----------
 
@@ -274,8 +283,13 @@ async function finish(text) {
   try {
     const r = await postJSON('heard', { text });
     if (!r.delivered_to) note('“' + text + '”: no agent is listening right now.');
-  } catch {
-    note('“' + text + '”: could not reach the display server.');
+  } catch (e) {
+    if (e instanceof Refused) {
+      note('“' + text + '”: the display server wants its token. Paste it in Settings.');
+      openSettings(true);
+    } else {
+      note('“' + text + '”: could not reach the display server.');
+    }
   }
 }
 
@@ -310,10 +324,20 @@ connect();
 const settings = $('#settings');
 let holdTimer = null;
 const corner = $('#corner');
-corner.addEventListener('pointerdown', () => { holdTimer = setTimeout(() => { settings.hidden = false; }, 800); });
+function openSettings(focusToken) {
+  settings.hidden = false;
+  if (focusToken) $('#token').focus();
+}
+corner.addEventListener('pointerdown', () => { holdTimer = setTimeout(() => openSettings(false), 800); });
 for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) {
   corner.addEventListener(ev, () => clearTimeout(holdTimer));
 }
+
+$('#token').value = token;
+$('#token').addEventListener('input', (e) => {
+  token = e.target.value.trim();
+  store.set('token', token);
+});
 
 $('#continuous').checked = continuous;
 $('#continuous').addEventListener('change', (e) => {

@@ -17,7 +17,8 @@ scripts/deploy.sh setup             # --addr 127.0.0.1:PORT to change the port
 This creates `~/Library/Application Support/agent-avatar/` (0700) with:
 
 - `token`: a random command token (0600, never printed). Give it to
-  the agent or adapter that drives the display.
+  the agent or adapter that drives the display, and paste it once into
+  the page's settings on the kiosk (the page needs it for `POST /heard`).
 - `screens.toml`: a copy of the synthetic example. Edit it to list your
   own pages; it stays on the host, never in the repo.
 - `releases/`: one folder per installed release.
