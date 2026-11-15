@@ -1,0 +1,26 @@
+[package]
+name = "agent-avatar-matrix"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Matrix adapter for agent-avatar: what the user says goes to an agent's room, the agent's replies are spoken"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "agent-avatar-matrix"
+path = "src/main.rs"
+
+[dependencies]
+futures-util = "0.3"
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "sync", "time"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+url = "2"
+
+[dev-dependencies]
+axum = "0.8"
