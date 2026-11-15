@@ -185,9 +185,10 @@ impl Avatar {
             .map(|_| ())
     }
 
-    pub async fn sprite(&self, state: &str) -> Result<(), Error> {
-        let req = self.http.post(join(&self.base, &["sprite"]));
-        call("sprite", self.auth(req).json(&json!({"state": state})))
+    /// Set the avatar state (`POST /display` with only `avatar`).
+    pub async fn avatar(&self, state: &str) -> Result<(), Error> {
+        let req = self.http.post(join(&self.base, &["display"]));
+        call("display", self.auth(req).json(&json!({"avatar": state})))
             .await
             .map(|_| ())
     }

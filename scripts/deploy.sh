@@ -3,7 +3,7 @@
 #
 #   scripts/deploy.sh setup [--addr HOST:PORT]
 #   scripts/deploy.sh setup-matrix --homeserver URL --user @U:S --room !R:S --agent @A:S
-#   scripts/deploy.sh try <ref> [--port P] [--check SCRIPT]
+#   scripts/deploy.sh try <ref> [--port P] [--check SCRIPT] [--screens FILE]
 #   scripts/deploy.sh try --clean
 #   scripts/deploy.sh build <tag> [--rebuild]
 #   scripts/deploy.sh install <tag> [--check SCRIPT]
@@ -37,8 +37,8 @@
 #          env --restart stop and start it with the server.
 # try      No sudo; nothing live changes. Builds <ref> (a branch or
 #          commit), starts it on 127.0.0.1:8077 (--port) with the live
-#          screens config and a scratch token, runs the install checks,
-#          then waits. Ctrl-C or TERM stops it; --clean does the same
+#          screens config (or --screens FILE) and a scratch token, runs
+#          the install checks, then waits. Ctrl-C or TERM stops it; --clean does the same
 #          after a kill -9.
 # build    No sudo. Checks the tag is a published release on origin/main,
 #          checks it out in a separate build worktree, compiles with
@@ -417,8 +417,8 @@ print(", ".join(s["name"] for s in json.load(open(sys.argv[1]))) or "none")' "$T
   # A command without the token must be refused when a token is set. No
   # body is sent, so nothing on the display changes either way.
   if [ -n "$TOKEN_FILE" ]; then
-    code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "http://$LISTEN/sprite")
-    echo "POST /sprite without a token -> $code"
+    code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "http://$LISTEN/display")
+    echo "POST /display without a token -> $code"
     [ "$code" = 401 ] || die "commands answer $code without the token; expected 401"
   else
     echo "note: no AVATAR_TOKEN_FILE; commands are open to anything that reaches the port"
@@ -471,10 +471,14 @@ try_stop() {
   echo "deleted $TRY_DATA"
 }
 
-cmd_try() { # ref port check-script
-  local ref=$1 port=$2 extra=$3
+cmd_try() { # ref port check-script screens-file
+  local ref=$1 port=$2 extra=$3 screens=$4
   [[ $port =~ ^[0-9]+$ ]] || die "--port takes a number"
   load_plist
+  if [ -n "$screens" ]; then
+    [ -r "$screens" ] || die "can't read $screens"
+    SCREENS=$(cd "$(dirname "$screens")" && pwd)/$(basename "$screens")
+  fi
   [ -z "$extra" ] || [ -r "$extra" ] || die "can't read $extra"
   LISTEN=127.0.0.1:$port
   ! lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1 ||
@@ -839,19 +843,20 @@ setup-matrix)
   ;;
 try)
   shift
-  ref= port=8077 check=
+  ref= port=8077 check= screens=
   [ "${1:-}" != --clean ] || { [ $# -eq 1 ] || usage; try_clean; exit 0; }
   while [ $# -gt 0 ]; do
     case $1 in
     --port) [ $# -ge 2 ] || usage; port=$2; shift ;;
     --check) [ $# -ge 2 ] || usage; check=$2; shift ;;
+    --screens) [ $# -ge 2 ] || usage; screens=$2; shift ;;
     -*) usage ;;
     *) [ -z "$ref" ] || usage; ref=$1 ;;
     esac
     shift
   done
   [ -n "$ref" ] || usage
-  cmd_try "$ref" "$port" "$check"
+  cmd_try "$ref" "$port" "$check" "$screens"
   ;;
 build)
   [ $# -ge 2 ] || die "usage: deploy.sh build <tag> [--rebuild]"

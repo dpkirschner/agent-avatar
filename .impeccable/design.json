@@ -1,0 +1,354 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-15T06:57:57+00:00",
+  "title": "Design System: agent-avatar (picture-book)",
+  "extensions": {
+    "colorMeta": {
+      "cobalt": {
+        "role": "primary",
+        "displayName": "Cobalt",
+        "tonalRamp": [
+          "oklch(15% 0.063 266)",
+          "oklch(26% 0.098 266)",
+          "oklch(38% 0.136 266)",
+          "oklch(50% 0.174 266)",
+          "oklch(62% 0.168 266)",
+          "oklch(74% 0.13 266)",
+          "oklch(85% 0.095 266)",
+          "oklch(95% 0.063 266)"
+        ]
+      },
+      "sunflower": {
+        "role": "primary",
+        "displayName": "Sunflower",
+        "tonalRamp": [
+          "oklch(15% 0.057 85)",
+          "oklch(26% 0.088 85)",
+          "oklch(38% 0.122 85)",
+          "oklch(50% 0.156 85)",
+          "oklch(62% 0.15 85)",
+          "oklch(74% 0.116 85)",
+          "oklch(85% 0.085 85)",
+          "oklch(95% 0.057 85)"
+        ]
+      },
+      "tomato": {
+        "role": "secondary",
+        "displayName": "Tomato",
+        "tonalRamp": [
+          "oklch(15% 0.063 33)",
+          "oklch(26% 0.098 33)",
+          "oklch(38% 0.136 33)",
+          "oklch(50% 0.174 33)",
+          "oklch(62% 0.168 33)",
+          "oklch(74% 0.13 33)",
+          "oklch(85% 0.095 33)",
+          "oklch(95% 0.063 33)"
+        ]
+      },
+      "cream": {
+        "role": "neutral",
+        "displayName": "Cream",
+        "tonalRamp": [
+          "oklch(15% 0.01 85)",
+          "oklch(26% 0.015 85)",
+          "oklch(38% 0.021 85)",
+          "oklch(50% 0.027 85)",
+          "oklch(62% 0.026 85)",
+          "oklch(74% 0.021 85)",
+          "oklch(85% 0.015 85)",
+          "oklch(95% 0.01 85)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "tonalRamp": [
+          "oklch(15% 0.023 280)",
+          "oklch(26% 0.036 280)",
+          "oklch(38% 0.05 280)",
+          "oklch(50% 0.064 280)",
+          "oklch(62% 0.062 280)",
+          "oklch(74% 0.048 280)",
+          "oklch(85% 0.035 280)",
+          "oklch(95% 0.023 280)"
+        ]
+      },
+      "periwinkle-dim": {
+        "role": "neutral",
+        "displayName": "Periwinkle Dim",
+        "tonalRamp": [
+          "oklch(15% 0.017 270)",
+          "oklch(26% 0.026 270)",
+          "oklch(38% 0.036 270)",
+          "oklch(50% 0.046 270)",
+          "oklch(62% 0.044 270)",
+          "oklch(74% 0.034 270)",
+          "oklch(85% 0.025 270)",
+          "oklch(95% 0.017 270)"
+        ]
+      },
+      "slate-ink-dim": {
+        "role": "neutral",
+        "displayName": "Slate Ink Dim",
+        "tonalRamp": [
+          "oklch(15% 0.013 290)",
+          "oklch(26% 0.021 290)",
+          "oklch(38% 0.029 290)",
+          "oklch(50% 0.037 290)",
+          "oklch(62% 0.035 290)",
+          "oklch(74% 0.027 290)",
+          "oklch(85% 0.02 290)",
+          "oklch(95% 0.013 290)"
+        ]
+      },
+      "parchment-line": {
+        "role": "neutral",
+        "displayName": "Parchment Line",
+        "tonalRamp": [
+          "oklch(15% 0.01 85)",
+          "oklch(26% 0.015 85)",
+          "oklch(38% 0.021 85)",
+          "oklch(50% 0.027 85)",
+          "oklch(62% 0.026 85)",
+          "oklch(74% 0.021 85)",
+          "oklch(85% 0.015 85)",
+          "oklch(95% 0.01 85)"
+        ]
+      },
+      "leaf": {
+        "role": "status",
+        "displayName": "Leaf",
+        "tonalRamp": [
+          "oklch(15% 0.033 155)",
+          "oklch(26% 0.052 155)",
+          "oklch(38% 0.072 155)",
+          "oklch(50% 0.092 155)",
+          "oklch(62% 0.088 155)",
+          "oklch(74% 0.068 155)",
+          "oklch(85% 0.05 155)",
+          "oklch(95% 0.033 155)"
+        ]
+      },
+      "amber": {
+        "role": "status",
+        "displayName": "Amber",
+        "tonalRamp": [
+          "oklch(15% 0.047 65)",
+          "oklch(26% 0.072 65)",
+          "oklch(38% 0.1 65)",
+          "oklch(50% 0.128 65)",
+          "oklch(62% 0.124 65)",
+          "oklch(74% 0.096 65)",
+          "oklch(85% 0.07 65)",
+          "oklch(95% 0.047 65)"
+        ]
+      },
+      "ochre": {
+        "role": "status",
+        "displayName": "Ochre",
+        "tonalRamp": [
+          "oklch(15% 0.043 85)",
+          "oklch(26% 0.067 85)",
+          "oklch(38% 0.093 85)",
+          "oklch(50% 0.119 85)",
+          "oklch(62% 0.115 85)",
+          "oklch(74% 0.089 85)",
+          "oklch(85% 0.065 85)",
+          "oklch(95% 0.043 85)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "said": {
+        "displayName": "Said",
+        "purpose": "The agent's current spoken line under the face."
+      },
+      "value": {
+        "displayName": "Value",
+        "purpose": "Key figures on figures cards."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Card titles, panel headings, start button."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Card text and list items."
+      },
+      "status": {
+        "displayName": "Status",
+        "purpose": "Top and bottom status lines."
+      },
+      "detail": {
+        "displayName": "Detail",
+        "purpose": "Secondary lines and labels."
+      }
+    },
+    "shadows": [
+      {
+        "name": "press-drop",
+        "value": "0 4px 0 0 #17173a",
+        "purpose": "Mic button: solid ink drop for tappable things."
+      },
+      {
+        "name": "press-drop-lg",
+        "value": "0 5px 0 0 #17173a",
+        "purpose": "Start button."
+      },
+      {
+        "name": "link-ring",
+        "value": "0 0 0 2px #17173a",
+        "purpose": "Ink ring around the connection dot."
+      }
+    ],
+    "motion": [
+      {
+        "name": "preset-split",
+        "value": "grid-template-columns .4s ease",
+        "purpose": "Stage split changes between presets."
+      },
+      {
+        "name": "face-tint",
+        "value": "fill .3s",
+        "purpose": "Face body tint per agent state."
+      },
+      {
+        "name": "blink",
+        "value": "5s infinite",
+        "purpose": "Idle blink."
+      },
+      {
+        "name": "breathe",
+        "value": "4s ease-in-out infinite, scale 1.02",
+        "purpose": "Idle breathing."
+      },
+      {
+        "name": "said-stale",
+        "value": "opacity .6s",
+        "purpose": "Spoken line fades once stale."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "portrait",
+        "value": "(orientation: portrait)"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "A cream page beside the face.",
+      "html": "<div class=\"ds-card\"><h3>Today</h3><p>Three things on the list.</p></div>",
+      "css": ".ds-card{background:#fbf3e2;color:#17173a;border:3px solid #17173a;border-radius:22px;padding:16px 20px 18px;font:17px/1.4 'Atkinson Hyperlegible Next',system-ui,sans-serif;max-width:320px}.ds-card h3{margin:0 0 10px;font-family:Fraunces,Georgia,serif;font-variation-settings:'SOFT' 100,'WONK' 1;font-size:23px;font-weight:640}.ds-card p{margin:0}"
+    },
+    {
+      "name": "Claim card",
+      "kind": "card",
+      "refersTo": "card-claim",
+      "description": "A critical alert taking the content area.",
+      "html": "<div class=\"ds-claim\"><h3>Backup failed</h3><p>Last good copy 2 days ago.</p></div>",
+      "css": ".ds-claim{background:#e2462b;color:#fbf3e2;border:3px solid #17173a;border-radius:22px;padding:16px 20px 18px;font:17px/1.4 'Atkinson Hyperlegible Next',system-ui,sans-serif;max-width:320px}.ds-claim h3{margin:0 0 10px;font-family:Fraunces,Georgia,serif;font-variation-settings:'SOFT' 100,'WONK' 1;font-size:33px;font-weight:640;line-height:1.15}.ds-claim p{margin:0;opacity:.85}"
+    },
+    {
+      "name": "Mic",
+      "kind": "button",
+      "refersTo": "mic",
+      "description": "Round cream push-to-talk button; sunflower while listening.",
+      "html": "<button class=\"ds-mic\">Talk</button>",
+      "css": ".ds-mic{width:68px;height:68px;border-radius:50%;background:#fbf3e2;color:#17173a;border:3px solid #17173a;box-shadow:0 4px 0 0 #17173a;font:700 15px 'Atkinson Hyperlegible Next',system-ui,sans-serif;transition:transform .1s,box-shadow .1s}.ds-mic:hover,.ds-mic:focus-visible{background:#ffc83d;outline:none}.ds-mic:active{transform:translateY(4px);box-shadow:0 0 0 0 #17173a}"
+    },
+    {
+      "name": "Start button",
+      "kind": "button",
+      "refersTo": "start-button",
+      "description": "The one tap that unlocks audio.",
+      "html": "<button class=\"ds-start\">Start</button>",
+      "css": ".ds-start{background:#ffc83d;color:#17173a;border:3px solid #17173a;box-shadow:0 5px 0 0 #17173a;border-radius:18px;padding:22px 40px;font-family:Fraunces,Georgia,serif;font-variation-settings:'SOFT' 100,'WONK' 1;font-size:26px}.ds-start:focus-visible{outline:3px solid #fbf3e2;outline-offset:3px}.ds-start:active{transform:translateY(5px);box-shadow:0 0 0 0 #17173a}"
+    },
+    {
+      "name": "Figure",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "A key figure on a figures card.",
+      "html": "<div class=\"ds-figure\"><span class=\"l\">Steps</span><span class=\"v\">8,412</span><span class=\"d\">+12% on last week</span></div>",
+      "css": ".ds-figure{display:flex;flex-direction:column;gap:2px;background:#fbf3e2;color:#17173a;padding:12px 16px;border:3px solid #17173a;border-radius:22px;font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;width:200px}.ds-figure .l,.ds-figure .d{color:#55546f;font-size:15px}.ds-figure .d{color:#2f7d52}.ds-figure .v{font-family:Fraunces,Georgia,serif;font-variation-settings:'SOFT' 100,'WONK' 1;font-size:44px;font-weight:700;line-height:1.05;font-variant-numeric:tabular-nums lining-nums}"
+    },
+    {
+      "name": "Goal bar",
+      "kind": "custom",
+      "refersTo": "goal-bar",
+      "description": "Progress toward a goal.",
+      "html": "<div class=\"ds-goal\"><div class=\"f\"></div></div>",
+      "css": ".ds-goal{width:240px;height:12px;border-radius:6px;background:#fbf3e2;box-shadow:inset 0 0 0 2.5px #17173a;overflow:hidden}.ds-goal .f{width:62%;height:100%;background:#ffc83d}"
+    },
+    {
+      "name": "Status line",
+      "kind": "nav",
+      "refersTo": "status",
+      "description": "Top and bottom strips on the cobalt ground.",
+      "html": "<div class=\"ds-status\"><span class=\"dot\"></span><span class=\"st\">listening</span><span>14:05</span><span class=\"hot\">2 alerts</span></div>",
+      "css": ".ds-status{display:flex;align-items:center;gap:18px;height:40px;padding:0 18px;background:#2340b8;color:#d3daf8;font:600 15px 'Atkinson Hyperlegible Next',system-ui,sans-serif;font-variant-numeric:tabular-nums}.ds-status .dot{width:10px;height:10px;border-radius:50%;background:#ffc83d;box-shadow:0 0 0 2px #17173a}.ds-status .st{font-family:Fraunces,Georgia,serif;font-variation-settings:'SOFT' 100,'WONK' 1;font-size:17px;color:#fbf3e2;font-weight:400}.ds-status .hot{color:#ffc83d}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Desk Companion",
+    "overview": "The kiosk is a friendly character who keeps the owner company on the desk. The sunflower face is the presence; the cream cards beside it are the things it is holding up to show you. The world borrows from picture books (flat cobalt ground, cream pages, a thick dark-ink outline, a soft wonky serif for anything said aloud), but the job is companionship at a glance, not storytelling: the face reads from two metres away, and so does whatever it shows.\n\nDensity is low on purpose. Large type, few marks, generous gaps, and one idea per card. Colour is flat and saturated: cobalt carries the page, cream carries content, sunflower marks what is live or highlighted, and tomato is kept for what demands attention. Everything is drawn with the same ink line, so a new card looks like it came from the same hand.\n\nThe look the world rules out is dashboard grey: dim slate text, small uppercase eyebrow labels and hairline borders on dark panels. That is the `plain` theme's job, and it must not creep back into this one.",
+    "keyCharacteristics": [
+      "Flat cobalt ground, cream cards, one dark-ink outline weight (3px).",
+      "A sunflower face that changes tint and motion with the agent's state.",
+      "Fraunces (soft, wonky axes on) for the spoken line, titles and figures; Atkinson Hyperlegible Next for everything read.",
+      "Depth only from ink: outlines on everything, solid ink drops only under things you can press.",
+      "Big, few, legible from across a desk."
+    ],
+    "rules": [
+      {
+        "name": "The Two Grounds Rule",
+        "section": "colors",
+        "body": "Text sits on cobalt or on cream, never anywhere else. On cobalt it is Cream or Periwinkle Dim; on cream it is Ink or Slate Ink Dim."
+      },
+      {
+        "name": "The Sunflower Means Live Rule",
+        "section": "colors",
+        "body": "Sunflower marks what is live or highlighted. One sunflower highlight per card at most; a card that is mostly yellow has said nothing."
+      },
+      {
+        "name": "The Tomato Is an Alarm Rule",
+        "section": "colors",
+        "body": "Tomato fills a surface only for a claim card. Elsewhere it is a dot, a delta or a series, never decoration."
+      },
+      {
+        "name": "The Spoken Serif Rule",
+        "section": "typography",
+        "body": "Fraunces is for what the companion says or names: the spoken line, titles, figures, the start button. Anything read as data or instructions is Atkinson."
+      },
+      {
+        "name": "The Sentence Case Rule",
+        "section": "typography",
+        "body": "Titles are sentence case at full title size. No small uppercase tracked labels (`--title-case: none`)."
+      },
+      {
+        "name": "The Press-Only Drop Rule",
+        "section": "elevation",
+        "body": "Only tappable things get an ink drop. Cards, panels and the face stay flat with outlines; a dropped card would read as a button."
+      }
+    ],
+    "dos": [
+      "Do set colour, type and surfaces through the tokens in `core/layout.css`; a theme overrides tokens first and adds signature rules only after.",
+      "Do outline every new mark in Ink at the existing weights (3px surfaces, 2.5px small marks).",
+      "Do use Fraunces with `SOFT 100, WONK 1` for spoken lines, titles and figures; Atkinson for everything read.",
+      "Do keep text on the two grounds: Cream or Periwinkle Dim on cobalt, Ink or Slate Ink Dim on cream.",
+      "Do check a new card at a desk's distance in all three presets and in portrait."
+    ],
+    "donts": [
+      "Don't let dashboard grey back in: no dim slate text on dark panels, no small uppercase tracked labels, no hairline borders.",
+      "Don't give cards, panels or the face an ink drop; drops are for things you press.",
+      "Don't fill a surface with Tomato except a claim card.",
+      "Don't put more than one Sunflower highlight in a card.",
+      "Don't style inside the face from a theme; dress it through the `--face-*` variables."
+    ]
+  }
+}

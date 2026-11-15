@@ -118,9 +118,13 @@ display.
 
 ## Open
 
-- Visual world: build the structure with neutral styling first, then
-  compare two or three worlds on the real layout. Candidates seen so
-  far: Picture Book Spread (flat cobalt, thick-outlined face) and
-  Exposure Record (dark backlit sheets, magenta for live voice).
-- The preset proportions and the status templates' slots and look
-  are decided in the build.
+- Visual world: the structure is built with neutral styling (branch
+  `display-frames`, 2026-11-14). Next, compare two or three worlds on
+  the real layout. Candidates seen so far: Picture Book Spread (flat
+  cobalt, thick-outlined face) and Exposure Record (dark backlit
+  sheets, magenta for live voice).
+- Settled in the build: presets `chat` 62/38, `split` 50/50, `focus`
+  24/76 (rows in portrait); status templates `desk` (alerts, mail,
+  next) and `note` (text). Their look comes with the world.
+- Not yet tried on the iPad: live speech, word-by-word subtitles,
+  mouth movement.

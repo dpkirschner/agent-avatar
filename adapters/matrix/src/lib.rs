@@ -3,7 +3,7 @@
 //! What the user says on the kiosk page arrives on the display server's
 //! `/heard/events` stream and goes into a Matrix room as the adapter's
 //! user. The agent's replies in that room (settled across edits) go back
-//! to the display server as `say`; its typing turns the sprite
+//! to the display server as `say`; its typing turns the avatar
 //! `thinking`. See docs/ARCHITECTURE.md § Adapters.
 
 pub mod config;
@@ -109,7 +109,7 @@ async fn deliver(avatar: &Avatar, hs: &Homeserver, data: &str) -> Result<(), Str
         Err(Error::Fatal(m)) => Err(m),
         Err(Error::Retry(m)) => {
             tracing::warn!("{m}; utterance dropped");
-            // Tell the user rather than leave the sprite thinking.
+            // Tell the user rather than leave the avatar thinking.
             if let Err(e) = avatar.say(UNREACHABLE).await {
                 tracing::warn!("{e}");
             }
@@ -159,7 +159,7 @@ async fn sync_loop(
     }
 }
 
-/// Settle replies and say them; follow the agent's typing on the sprite.
+/// Settle replies and say them; follow the agent's typing on the avatar.
 async fn speak_loop(
     avatar: Arc<Avatar>,
     mut rx: mpsc::Receiver<Incoming>,
@@ -183,14 +183,14 @@ async fn speak_loop(
                     Incoming::Message { event_id, body } => replies.message(&event_id, &body, now),
                     Incoming::Edit { target, body } => replies.edit(&target, &body, now),
                     Incoming::Typing(t) => {
-                        let sprite = match (typing, t) {
+                        let state = match (typing, t) {
                             (false, true) => Some("thinking"),
                             (true, false) if !replies.is_pending() => Some("idle"),
                             _ => None,
                         };
                         typing = t;
-                        if let Some(s) = sprite {
-                            report(avatar.sprite(s).await)?;
+                        if let Some(s) = state {
+                            report(avatar.avatar(s).await)?;
                         }
                     }
                 }

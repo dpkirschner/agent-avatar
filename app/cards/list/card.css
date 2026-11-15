@@ -1,0 +1,6 @@
+.card-list li { display: grid; grid-template-columns: 18px 1fr; gap: 2px 8px; align-items: baseline; }
+.card-list li::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--mark); align-self: center; justify-self: center; }
+.card-list li.done::before { width: 10px; height: 5px; border-radius: 0; background: none; border: solid var(--good); border-width: 0 0 2.5px 2.5px; transform: translateY(-2px) rotate(-45deg); }
+.card-list li.done .t { color: var(--card-dim); text-decoration: line-through; }
+.card-list li.warn::before { width: 9px; height: 9px; border-radius: 1px; background: var(--warn); transform: rotate(45deg); }
+.card-list li .detail { grid-column: 2; }

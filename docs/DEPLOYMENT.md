@@ -25,7 +25,7 @@ This creates `~/Library/Application Support/agent-avatar/` (0700) with:
 
 and `/Library/LaunchDaemons/com.agent-avatar.server.plist` (root:wheel
 644), which runs `releases/current/agent-avatar-server` as you, with
-`AVATAR_ADDR`, `AVATAR_SCREENS` and `AVATAR_TOKEN_FILE` set, logging to
+`AVATAR_ADDR`, `AVATAR_SCREENS` and `AVATAR_TOKEN_FILE` set (optionally `AVATAR_THEME`, `AVATAR_FACE`), logging to
 `~/Library/Logs/agent-avatar.log`. Nothing starts until the first
 install. Each release holds both binaries, the server and the Matrix
 adapter; the adapter only runs once `setup-matrix` installs its plist
@@ -48,8 +48,9 @@ switches back to the previous release; `status` shows what's live and
 installed.
 
 Before releasing, `scripts/deploy.sh try <branch>` runs a branch on
-127.0.0.1:8077 with the live screens config and a scratch token, so
-nothing live changes.
+127.0.0.1:8077 with the live screens config (or `--screens FILE`, for a
+screen the live server can't load yet) and a scratch token, so nothing
+live changes.
 
 ## 3. Settings
 

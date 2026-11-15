@@ -1,11 +1,13 @@
-// agent-avatar kiosk page: follows the display server over SSE, shows the
-// current screen and sprite state, speaks `say` lines, and sends what the
-// user says to POST /heard. Browser notes behind the choices here are in
-// docs/ARCHITECTURE.md (Kiosk page).
+// agent-avatar kiosk page: follows the display server over SSE, draws the
+// display (preset, cards, status lines) and the avatar, speaks `say` lines
+// with word-by-word subtitles, and sends what the user says to POST /heard.
+// Browser notes behind the choices here are in docs/ARCHITECTURE.md
+// (Kiosk page). Agent data only ever reaches the DOM as textContent.
 'use strict';
 
 const $ = (sel) => document.querySelector(sel);
 const app = $('#app');
+const { el, fmtClock, history, HISTORY_MAX } = Kiosk;
 
 // ---------- small helpers ----------
 
@@ -29,47 +31,154 @@ async function postJSON(path, body) {
   return res.json();
 }
 
-// ---------- sprite state ----------
+// ---------- avatar ----------
+
+// The avatar module (app/avatars/<name>/avatar.js) behind its contract:
+// mount, state, mouth, size. A missing module leaves the column empty.
+const face = window.AvatarFace || { mount() {}, state() {}, mouth() {}, size() {} };
+face.mount($('#avatar'));
 
 // What the server says the avatar is doing; local speech and listening
 // take precedence while they last.
-let serverSprite = 'idle';
+let serverState = 'idle';
 let speaking = false;
 let listening = false;
+let linkUp = false;
 
 function render() {
-  app.dataset.state = speaking ? 'talking' : listening ? 'listening' : serverSprite;
+  const s = speaking ? 'talking' : listening ? 'listening' : serverState;
+  app.dataset.state = s;
+  face.state(s);
   $('#mic').textContent = listening ? 'Stop' : 'Talk';
+  $('#agent-state').textContent = linkUp ? (s === 'idle' ? '' : s) : 'offline';
+  app.classList.toggle('down', !linkUp);
 }
 
-const tpl = $('#sprite-tpl');
-$('#avatar').appendChild(tpl.content.cloneNode(true));
-
-function flapMouth() {
-  const m = document.querySelector('.sprite .mouth');
-  if (!m) return;
-  m.classList.add('flap');
-  setTimeout(() => m.classList.remove('flap'), 140);
+// Mouth: a word boundary opens it, then it settles. When no boundaries
+// come (some voices send none), it moves on a gentle loop instead.
+let lastBoundary = 0;
+let mouthLoop = 0;
+function pulseMouth() { lastBoundary = performance.now(); }
+function driveMouth() {
+  cancelAnimationFrame(mouthLoop);
+  const tick = (now) => {
+    if (!speaking) { face.mouth(0); return; }
+    let v;
+    const since = now - lastBoundary;
+    if (since < 400) v = Math.max(0.2, 1 - since / 220);
+    else if (lastBoundary === 0 || since > 900) v = 0.25 + 0.35 * Math.abs(Math.sin(now / 90));
+    else v = 0.2;
+    face.mouth(v);
+    mouthLoop = requestAnimationFrame(tick);
+  };
+  mouthLoop = requestAnimationFrame(tick);
 }
 
-// ---------- screens ----------
+// ---------- subtitles and history ----------
 
-const frame = $('#screen');
-function showScreen(s) {
-  if (s && s.url) {
-    if (frame.dataset.url !== s.url) {
-      frame.dataset.url = s.url;
-      frame.src = s.url;
-      frame.title = s.title || s.screen;
-    }
-    frame.hidden = false;
-    app.classList.add('has-screen');
-  } else {
-    frame.hidden = true;
-    frame.dataset.url = '';
-    frame.src = 'about:blank';
-    app.classList.remove('has-screen');
+// Both sides go into Kiosk.history; cards that show it are told.
+function remember(who, text) {
+  history.push({ who, text, at: new Date() });
+  if (history.length > HISTORY_MAX) history.shift();
+  for (const card of content.querySelectorAll('.card')) {
+    const spec = Kiosk.cards[card.dataset.type];
+    if (spec && spec.history) spec.history(card);
   }
+}
+
+const said = $('#said');
+let staleTimer = 0;
+let subtitle = null; // { text, done, todo }
+
+function showLine(text, reveal) {
+  clearTimeout(staleTimer);
+  said.classList.remove('stale');
+  said.textContent = '';
+  const p = el('span');
+  const done = el('span', 'done', reveal ? '' : text);
+  const todo = el('span', 'todo', reveal ? text : '');
+  p.append(done, todo);
+  said.appendChild(p);
+  subtitle = { text, done, todo };
+}
+function revealTo(n) {
+  if (!subtitle) return;
+  const { text, done, todo } = subtitle;
+  n = Math.max(0, Math.min(text.length, n));
+  done.textContent = text.slice(0, n);
+  todo.textContent = text.slice(n);
+}
+function lineDone() {
+  if (subtitle) revealTo(subtitle.text.length);
+  staleTimer = setTimeout(() => said.classList.add('stale'), 10000);
+}
+// End of the word starting at `i`.
+function wordEnd(text, i) {
+  const m = /\s/.exec(text.slice(i));
+  return m ? i + m.index : text.length;
+}
+
+// ---------- status lines ----------
+
+function renderBar(host, bar) {
+  const items = host.querySelector('.items');
+  items.textContent = '';
+  const make = bar && Kiosk.templates[bar.template];
+  if (make) for (const e of make(bar.items || {})) if (e) items.appendChild(e);
+}
+
+function tickClock() {
+  const c = $('#clock');
+  const now = new Date();
+  c.textContent = fmtClock(now);
+  c.dateTime = now.toISOString();
+}
+tickClock();
+setInterval(tickClock, 15000);
+
+// ---------- display ----------
+
+const content = $('#content');
+
+function renderDisplay(d) {
+  app.dataset.preset = d.preset;
+  face.size(d.preset);
+  renderBar($('#top'), d.status && d.status.top);
+  const bottom = d.status && d.status.bottom;
+  $('#bottom').hidden = !bottom;
+  renderBar($('#bottom'), bottom);
+
+  let cards = d.content || [];
+  // A card whose module says it claims (a screen, a critical alert)
+  // takes the whole content area.
+  const claim = cards.find((c) => { const s = Kiosk.cards[c.type]; return s && s.claims && s.claims(c); });
+  if (claim) cards = [claim];
+  app.classList.toggle('empty', cards.length === 0);
+
+  content.textContent = '';
+  const drawn = [];
+  for (const c of cards) {
+    const card = el('article', 'card card-' + c.type);
+    card.dataset.type = c.type;
+    const spec = Kiosk.cards[c.type];
+    try {
+      if (spec) spec.render(card, c);
+      else unknownCard(card);
+    } catch (e) {
+      card.textContent = '';
+      card.appendChild(el('p', 'empty-note', 'Could not draw this card.'));
+    }
+    // A claiming card fills the column instead of fitting its content.
+    if (c === claim) { card.classList.remove('fit'); card.classList.add('claim'); }
+    content.appendChild(card);
+    drawn.push([card, spec]);
+  }
+  for (const [card, spec] of drawn) if (spec && spec.mounted) spec.mounted(card);
+  for (const spec of Object.values(Kiosk.cards)) if (spec.settle) spec.settle();
+}
+
+function unknownCard(card) {
+  card.appendChild(el('p', 'empty-note', 'This page doesn’t know that card yet. Reload?'));
 }
 
 // ---------- unlock: one tap per page load ----------
@@ -141,8 +250,8 @@ const queue = [];
 let current = null;
 
 function enqueue(line) {
-  $('#said').textContent = line.text;
-  if (!unlocked) return; // shown, not spoken: no tap yet
+  remember('agent', line.text);
+  if (!unlocked) { showLine(line.text, false); lineDone(); return; } // shown, not spoken: no tap yet
   queue.push(line);
   if (!current) next();
 }
@@ -152,32 +261,69 @@ function next() {
   if (!current) { speaking = false; render(); resumeListening(); return; }
   pauseListening();
   speaking = true;
+  lastBoundary = 0;
   render();
-  $('#said').textContent = current.text;
+  driveMouth();
   const line = current;
-  const done = () => { if (current === line) next(); };
+  const done = () => { if (current === line) { lineDone(); next(); } };
   if (line.audio) playAudio(line, done);
   else speakText(line.text, done);
 }
 
+// Server audio: with word timings the subtitle follows the audio clock;
+// without, the line shows whole.
 function playAudio(line, done) {
-  player.onended = done;
-  player.onerror = () => speakText(line.text, done);
+  const words = Array.isArray(line.words) ? wordOffsets(line.text, line.words) : null;
+  showLine(line.text, !!words);
+  let raf = 0;
+  const follow = () => {
+    const ms = player.currentTime * 1000;
+    let n = 0;
+    for (const w of words) { if (w.t_ms <= ms) { n = w.end; } else break; }
+    if (n !== follow.n) { follow.n = n; revealTo(n); pulseMouth(); }
+    raf = requestAnimationFrame(follow);
+  };
+  const end = () => { cancelAnimationFrame(raf); done(); };
+  player.onended = end;
+  player.onerror = () => { cancelAnimationFrame(raf); speakText(line.text, done); };
   player.src = line.audio;
-  player.play().catch(() => speakText(line.text, done));
+  player.play().then(() => { if (words) follow(); }).catch(() => { cancelAnimationFrame(raf); speakText(line.text, done); });
 }
 
+// Where each timed word ends in the text, matched in order.
+function wordOffsets(text, words) {
+  let at = 0;
+  const out = [];
+  for (const w of words) {
+    if (typeof w.text !== 'string' || typeof w.t_ms !== 'number') continue;
+    const i = text.indexOf(w.text, at);
+    if (i < 0) continue;
+    at = i + w.text.length;
+    out.push({ t_ms: w.t_ms, end: at });
+  }
+  return out;
+}
+
+// Browser voice: word-boundary events reveal the subtitle. A voice that
+// sends none gets the whole line after a moment.
 function speakText(text, done) {
-  if (!synth) { setTimeout(done, 1500); return; }
+  showLine(text, true);
+  const whole = setTimeout(() => { if (!lastBoundary) revealTo(text.length); }, 700);
+  if (!synth) { revealTo(text.length); setTimeout(done, 1500); return; }
   synth.cancel();
   const u = new SpeechSynthesisUtterance(text);
   const v = voices.find((x) => x.voiceURI === store.get('voice', ''));
   if (v) u.voice = v;
   u.rate = +store.get('rate', '1');
   // Safari sometimes never fires `end`; don't stay stuck talking.
-  const guard = setTimeout(done, 4000 + text.length * 120);
-  const finish = () => { clearTimeout(guard); done(); };
-  u.onboundary = flapMouth;
+  const guard = setTimeout(finish, 4000 + text.length * 120);
+  function finish() { clearTimeout(guard); clearTimeout(whole); done(); }
+  u.onboundary = (e) => {
+    if (e.name && e.name !== 'word') return;
+    pulseMouth();
+    const i = e.charIndex || 0;
+    revealTo(e.charLength ? i + e.charLength : wordEnd(text, i));
+  };
   u.onend = finish;
   u.onerror = finish;
   synth.speak(u);
@@ -190,6 +336,7 @@ function stopSpeaking() {
   player.pause();
   if (synth) synth.cancel();
   speaking = false;
+  lineDone();
   render();
 }
 
@@ -211,9 +358,9 @@ const RECOGNITION_ERRORS = {
   'not-allowed': 'Microphone or speech recognition is not allowed. Check Settings › Safari.',
   'service-not-allowed': 'Microphone or speech recognition is not allowed. Check Settings › Safari.',
   // Brave and other Chromium builds without Google's speech service land here.
-  network: 'This browser\u2019s speech service isn\u2019t available. Use Safari (or Chrome).',
+  network: 'This browser’s speech service isn’t available. Use Safari (or Chrome).',
   'audio-capture': 'No microphone found.',
-  'language-not-supported': 'Speech recognition doesn\u2019t support this language.',
+  'language-not-supported': 'Speech recognition doesn’t support this language.',
 };
 function warn(msg) { const w = $('#warn'); w.textContent = msg; w.hidden = false; }
 
@@ -287,6 +434,7 @@ async function finish(text) {
   const h = $('#heard');
   h.classList.remove('note');
   h.textContent = text;
+  remember('you', text);
   if (!continuous && rec && listening) rec.stop();
   try {
     const r = await postJSON('heard', { text });
@@ -314,15 +462,16 @@ $('#mic').addEventListener('click', () => {
 function connect() {
   const es = new EventSource('events');
   const link = $('#link');
-  es.onopen = () => link.classList.add('up');
-  es.onerror = () => link.classList.remove('up'); // EventSource retries on its own
+  es.onopen = () => { linkUp = true; link.classList.add('up'); render(); };
+  // EventSource retries on its own; the status line says we're offline.
+  es.onerror = () => { linkUp = false; link.classList.remove('up'); render(); };
   const on = (name, fn) => es.addEventListener(name, (e) => {
     let data;
     try { data = JSON.parse(e.data); } catch { return; }
     fn(data);
   });
-  on('show', showScreen);
-  on('sprite', (d) => { serverSprite = d.state; render(); });
+  on('display', renderDisplay);
+  on('avatar', (d) => { serverState = d.state; render(); });
   on('say', enqueue);
 }
 connect();

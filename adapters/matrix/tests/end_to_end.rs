@@ -24,7 +24,7 @@ const AVATAR_TOKEN: &str = "avatar-test-token";
 struct Seen {
     sent: Vec<String>,
     said: Vec<String>,
-    sprites: Vec<String>,
+    avatars: Vec<String>,
 }
 
 type Shared = Arc<Mutex<Seen>>;
@@ -159,18 +159,18 @@ fn display(seen: Shared) -> Router {
             .push(b["text"].as_str().unwrap().to_string());
         StatusCode::OK
     };
-    let sprite = |State(s): State<Shared>, h: HeaderMap, Json(b): Json<Value>| async move {
+    let display = |State(s): State<Shared>, h: HeaderMap, Json(b): Json<Value>| async move {
         assert!(authed(&h));
         s.lock()
             .unwrap()
-            .sprites
-            .push(b["state"].as_str().unwrap().to_string());
+            .avatars
+            .push(b["avatar"].as_str().unwrap().to_string());
         StatusCode::OK
     };
     Router::new()
         .route("/heard/events", get(heard))
         .route("/say", post(say))
-        .route("/sprite", post(sprite))
+        .route("/display", post(display))
         .with_state(seen)
 }
 
@@ -207,7 +207,7 @@ async fn speech_goes_in_and_the_settled_reply_comes_out_once() {
     let seen = seen.lock().unwrap();
     assert_eq!(seen.sent, vec!["what's new"]);
     assert_eq!(seen.said, vec!["Two new mail."]);
-    assert_eq!(seen.sprites, vec!["thinking"]);
+    assert_eq!(seen.avatars, vec!["thinking"]);
 }
 
 #[tokio::test]

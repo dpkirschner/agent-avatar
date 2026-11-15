@@ -1,0 +1,46 @@
+/* The "blob" avatar. Scoped to .blob; the layout and themes never style
+   inside it. A theme dresses it through these variables only:
+   --face-idle/-listening/-thinking/-talking (body fill per state),
+   --face-line and --face-line-w (outline), --face-eye (whites),
+   --face-ink (pupils, mouth), --face-ring (listening ring),
+   --face-dots (thinking dots). */
+.blob {
+  --blob-idle: var(--face-idle, #3a4a5c);
+  --blob-listening: var(--face-listening, #2f5a4c);
+  --blob-thinking: var(--face-thinking, #5a4a2f);
+  --blob-talking: var(--face-talking, #3d4f7a);
+  width: 100%; height: 100%;
+  max-width: 520px; max-height: 520px;
+  overflow: visible;
+}
+.blob .body { fill: var(--blob-idle); stroke: var(--face-line, none); stroke-width: var(--face-line-w, 0); transition: fill .3s; }
+.blob .ring { fill: none; stroke: var(--face-ring, var(--acc, #7cc4a4)); stroke-width: var(--face-line-w, 4); opacity: 0; }
+.blob .eye { fill: var(--face-eye, #f2efe8); stroke: var(--face-line, none); stroke-width: calc(var(--face-line-w, 0px) * .8); }
+.blob .pupil { fill: var(--face-ink, #14161b); transition: transform .3s; }
+.blob .mouth { fill: var(--face-ink, #14161b); transform-box: fill-box; transform-origin: center; transform: scaleY(.15); transition: transform .06s linear; }
+.blob .dots circle { fill: var(--face-dots, #e0a458); stroke: var(--face-line, none); stroke-width: calc(var(--face-line-w, 0px) * .6); opacity: 0; }
+.blob .eyes { transform-box: fill-box; transform-origin: center; animation: blob-blink 5s infinite; }
+.blob .bob { transform-box: fill-box; transform-origin: center; animation: blob-breathe 4s ease-in-out infinite; }
+@keyframes blob-blink { 0%, 94%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.1); } }
+@keyframes blob-breathe { 50% { transform: scale(1.02); } }
+
+.blob[data-state=listening] .body { fill: var(--blob-listening); }
+.blob[data-state=listening] .ring { animation: blob-ring 1.2s ease-out infinite; }
+.blob[data-state=listening] .eyes { animation: none; transform: scale(1.12); }
+@keyframes blob-ring { 0% { opacity: .8; r: 92px; } 100% { opacity: 0; r: 118px; } }
+
+.blob[data-state=thinking] .body { fill: var(--blob-thinking); }
+.blob[data-state=thinking] .pupil { transform: translate(6px, -8px); }
+.blob[data-state=thinking] .dots circle { animation: blob-dot 1.2s infinite; }
+.blob[data-state=thinking] .dots circle:nth-child(2) { animation-delay: .2s; }
+.blob[data-state=thinking] .dots circle:nth-child(3) { animation-delay: .4s; }
+@keyframes blob-dot { 0%, 100% { opacity: .15; } 50% { opacity: 1; } }
+
+.blob[data-state=talking] .body { fill: var(--blob-talking); }
+
+/* A narrow column: drop the thought dots, they'd crowd the face. */
+.blob[data-size=focus] .dots { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .blob .eyes, .blob .bob { animation: none; }
+}

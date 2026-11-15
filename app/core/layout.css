@@ -1,0 +1,241 @@
+/* agent-avatar kiosk: layout. Structure only. Every colour, font and
+   surface comes from a token below; a theme (themes/<name>/theme.css,
+   loaded after this and the cards) sets the tokens and may add its own
+   signature rules. Cards style themselves with the same tokens
+   (cards/<type>/card.css), so a new card works under every theme.
+   No inline styles: the page CSP is style-src 'self'. */
+:root {
+  /* page */
+  --bg: #14161b;
+  --fg: #e9e6df;            /* text on the page ground */
+  --dim: #9aa0aa;           /* secondary text on the ground */
+  --acc: #7cc4a4;           /* live: listening, connection up */
+  --good: #7cc4a4;
+  --warn: #e0a458;
+  --bad: #e06c6c;
+  --font-body: -apple-system, system-ui, sans-serif;
+  --font-display: var(--font-body);   /* titles, figures, the spoken line */
+  --display-axes: normal;             /* font-variation-settings for display */
+  --gap: 14px;
+
+  /* status lines */
+  --status-h: 34px;
+  --status-fg: var(--dim);
+  --status-size: 14px;
+  --status-weight: 400;
+  --status-rule: 1px solid #2c303a;
+
+  /* subtitles */
+  --said-size: 24px;
+  --said-weight: 400;
+  --said-style: normal;
+  --said-fg: var(--fg);
+
+  /* mic button */
+  --mic-bg: var(--card-bg);
+  --mic-fg: var(--fg);
+  --mic-border: 1px solid var(--card-line);
+  --mic-shadow: none;
+  --mic-on-bg: var(--acc);
+  --mic-on-fg: #111;
+
+  /* cards */
+  --card-bg: #1d2027;
+  --card-fg: var(--fg);
+  --card-dim: #9aa0aa;      /* secondary text on a card */
+  --card-line: #2c303a;     /* rules, grid lines, empty bars */
+  --card-border: 1px solid #2c303a;
+  --card-radius: 14px;
+  --card-shadow: none;
+  --card-pad: 14px 16px;
+  --title-size: 13px;
+  --title-weight: 600;
+  --title-case: uppercase;
+  --title-tracking: .06em;
+  --title-fg: var(--card-dim);
+  --value-size: 34px;
+  --value-weight: 600;
+  --fill: var(--acc);       /* progress fills, the highlighted bar */
+  --mark: var(--card-fg);   /* list bullets, outlines of small marks */
+  --mark-line: 0px;         /* outline width on small marks */
+  --hl: var(--card-fg);     /* chart highlight band */
+  --hl-opacity: .08;
+  --plot-line: 2.5px;
+  --s1: #7cc4a4; --s2: #8fa8e0; --s3: #e0a458; --s4: #c48fd0;
+
+  /* a card that claims the content area (critical alert) */
+  --claim-bg: var(--card-bg);
+  --claim-fg: var(--card-fg);
+  --claim-border: 1px solid var(--bad);
+
+  /* overlays and settings */
+  --overlay-bg: rgba(10, 11, 14, .88);
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; height: 100%;
+  background: var(--bg); color: var(--fg);
+  font: 17px/1.4 var(--font-body);
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+  overflow: hidden;
+}
+button, select, input { font: inherit; color: inherit; }
+button {
+  background: var(--card-bg); color: var(--card-fg); border: var(--card-border);
+  border-radius: 12px; padding: 10px 16px;
+}
+:focus-visible { outline: 3px solid var(--acc); outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+#app {
+  position: fixed; inset: 0;
+  display: grid; grid-template-rows: auto 1fr auto;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* ---------- status lines ---------- */
+.status {
+  height: var(--status-h);
+  display: flex; align-items: center; justify-content: space-between; gap: 18px;
+  padding: 0 18px;
+  font-size: var(--status-size); font-weight: var(--status-weight); color: var(--status-fg);
+  font-variant-numeric: tabular-nums;
+}
+#top { border-bottom: var(--status-rule); }
+#bottom { border-top: var(--status-rule); }
+.status .items, .status .own { display: flex; align-items: center; gap: 18px; min-width: 0; }
+.status .item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.status .item.text { overflow: hidden; text-overflow: ellipsis; }
+.status .item svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.status .item.hot { color: var(--warn); }
+.status .item.zero { opacity: .6; }
+#link { width: 10px; height: 10px; border-radius: 50%; background: var(--bad); flex: none; transition: background .3s; }
+#link.up { background: var(--acc); }
+#app.down #agent-state { color: var(--bad); }
+
+/* ---------- stage: avatar left, content right ---------- */
+#stage {
+  display: grid; min-height: 0;
+  grid-template-columns: 62fr 38fr;
+  gap: var(--gap); padding: var(--gap);
+  transition: grid-template-columns .4s ease;
+}
+#app[data-preset=split] #stage { grid-template-columns: 1fr 1fr; }
+#app[data-preset=focus] #stage { grid-template-columns: 24fr 76fr; }
+/* No cards: the avatar has the stage. */
+#app.empty #stage { grid-template-columns: 1fr 0fr; }
+#app.empty #content { visibility: hidden; }
+
+#side {
+  display: flex; flex-direction: column; align-items: center;
+  min-width: 0; min-height: 0; gap: 16px;
+}
+#avatar {
+  flex: 1 1 auto; min-height: 0; width: 100%;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* Subtitles: the agent's current line large, the owner's last line small. */
+#subs {
+  width: 100%; max-width: 46em;
+  display: flex; flex-direction: column; justify-content: flex-end; gap: 4px;
+  text-align: center;
+}
+#subs p { margin: 0; }
+#subs p:empty { display: none; }
+#heard { color: var(--dim); font-size: 15px; }
+#heard.note { color: var(--warn); }
+#interim { color: var(--dim); font-size: 15px; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#said {
+  font-family: var(--font-display); font-variation-settings: var(--display-axes);
+  font-size: var(--said-size); font-weight: var(--said-weight); font-style: var(--said-style);
+  color: var(--said-fg); line-height: 1.25; text-wrap: balance;
+  max-height: calc(1.25em * 3); overflow: hidden;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  transition: opacity .6s;
+}
+#said .todo { opacity: 0; }
+#said.stale { opacity: .45; }
+#app[data-preset=focus] #said { font-size: calc(var(--said-size) * .66); max-height: calc(1.25em * 5); }
+#app[data-preset=focus] #heard, #app[data-preset=focus] #interim { font-size: 13px; }
+
+#mic {
+  width: 68px; height: 68px; flex: none; border-radius: 50%;
+  background: var(--mic-bg); color: var(--mic-fg); border: var(--mic-border); box-shadow: var(--mic-shadow);
+  font-size: 15px; font-weight: 700;
+}
+[data-state=listening] #mic { background: var(--mic-on-bg); color: var(--mic-on-fg); }
+
+/* ---------- content: the card column ---------- */
+#content {
+  display: flex; flex-direction: column; gap: var(--gap);
+  min-width: 0; min-height: 0; overflow: hidden;
+}
+.card {
+  flex: 1 1 0; min-height: 0;
+  display: flex; flex-direction: column; gap: 10px;
+  background: var(--card-bg); color: var(--card-fg);
+  border: var(--card-border); border-radius: var(--card-radius); box-shadow: var(--card-shadow);
+  padding: var(--card-pad); overflow: hidden;
+}
+.card.fit { flex: 0 1 auto; }
+.card.claim { background: var(--claim-bg); color: var(--claim-fg); border: var(--claim-border); }
+.card h3 {
+  margin: 0;
+  font-family: var(--font-display); font-variation-settings: var(--display-axes);
+  font-size: var(--title-size); font-weight: var(--title-weight); color: var(--title-fg);
+  text-transform: var(--title-case); letter-spacing: var(--title-tracking);
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.card.claim h3 { color: inherit; }
+.card .scroll { overflow: auto; min-height: 0; flex: 1 1 auto; }
+.card ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.card .detail { color: var(--card-dim); font-size: 15px; }
+.card.claim .detail { color: inherit; opacity: .85; }
+.card .empty-note { color: var(--card-dim); }
+
+/* Hold here to open settings. */
+#corner { position: fixed; left: 0; top: 0; width: 72px; height: 72px; z-index: 5; }
+
+/* Portrait: avatar on top, content below; the presets set the rows. */
+@media (orientation: portrait) {
+  #stage { grid-template-columns: 1fr !important; grid-template-rows: 62fr 38fr; transition: grid-template-rows .4s ease; }
+  #app[data-preset=split] #stage { grid-template-rows: 1fr 1fr; }
+  #app[data-preset=focus] #stage { grid-template-rows: 22fr 78fr; }
+  #app.empty #stage { grid-template-rows: 1fr 0fr; }
+  #app[data-preset=focus] #side { flex-direction: row; }
+  #app[data-preset=focus] #subs { text-align: left; }
+}
+
+/* ---------- overlays ---------- */
+.overlay {
+  position: fixed; inset: 0; z-index: 10;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  background: var(--overlay-bg); color: var(--fg);
+  padding: 24px; text-align: center;
+}
+#start-btn {
+  font-family: var(--font-display); font-variation-settings: var(--display-axes);
+  font-size: 26px; padding: 22px 40px; border-radius: 18px;
+  background: var(--mic-on-bg); color: var(--mic-on-fg);
+}
+.hint { color: var(--dim); max-width: 34em; margin: 0; }
+#warn { color: var(--bad); max-width: 34em; margin: 0; }
+.panel {
+  background: var(--card-bg); color: var(--card-fg);
+  border: var(--card-border); border-radius: var(--card-radius);
+  padding: 20px 22px; width: min(480px, 100%); text-align: left;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.panel h2 {
+  margin: 0; font-family: var(--font-display); font-variation-settings: var(--display-axes);
+  font-size: calc(var(--title-size) + 2px); font-weight: var(--title-weight); color: var(--title-fg);
+  text-transform: var(--title-case); letter-spacing: var(--title-tracking);
+}
+.panel .hint { color: var(--card-dim); }
+.panel label { display: flex; gap: 10px; align-items: center; }
+.panel select, .panel input[type=password] { background: var(--bg); color: var(--fg); border: var(--card-border); border-radius: 8px; padding: 6px; flex: 1; min-width: 0; }
+.panel input[type=range] { flex: 1; accent-color: var(--acc); }
+.panel .row { display: flex; gap: 10px; flex-wrap: wrap; }
+.panel .primary { align-self: flex-end; }
